@@ -112,12 +112,13 @@ export async function loadDataFromSupabase() {
   try {
     console.log('开始从 Supabase 加载数据...');
     
-    // 加载游戏数据
+    // 加载游戏数据（包含图集）
     const { data: gamesData, error: gamesError } = await supabase
       .from('games')
       .select(`
         *,
-        profiles:creator(name, avatar_url)
+        profiles:creator(name, avatar_url),
+        game_images(image_url, position)
       `)
       .order('created_at', { ascending: false });
     
@@ -125,28 +126,37 @@ export async function loadDataFromSupabase() {
       console.error('加载游戏数据失败:', gamesError);
     } else if (gamesData && gamesData.length > 0) {
       // 转换 Supabase 数据格式为本地格式
-      const convertedGames = gamesData.map(game => ({
-        id: game.id,
-        title: game.title,
-        company: game.company || '',
-        price: game.price || 0,
-        genres: game.genres || [],
-        background: game.background || '',
-        gameplay: game.gameplay || '',
-        officialUrl: game.official_url || '',
-        cover: game.cover_url || '',
-        gallery: [], // 暂时为空，可以后续扩展
-        createdAt: new Date(game.created_at).getTime(),
-        creator: game.profiles?.name || '匿名',
-        supabase_id: game.id
-      }));
+      const convertedGames = gamesData.map(game => {
+        // 处理图集数据
+        const gallery = game.game_images 
+          ? game.game_images
+              .sort((a, b) => a.position - b.position) // 按位置排序
+              .map(img => img.image_url)
+          : [];
+        
+        return {
+          id: game.id,
+          title: game.title,
+          company: game.company || '',
+          price: game.price || 0,
+          genres: game.genres || [],
+          background: game.background || '',
+          gameplay: game.gameplay || '',
+          officialUrl: game.official_url || '',
+          cover: game.cover_url || '',
+          gallery: gallery, // 从 game_images 表加载的图集
+          createdAt: new Date(game.created_at).getTime(),
+          creator: game.profiles?.name || '匿名',
+          supabase_id: game.id
+        };
+      });
       
       // 合并到现有游戏数据中，避免重复
       const existingIds = new Set(store.games.map(g => g.supabase_id).filter(Boolean));
       const newGames = convertedGames.filter(g => !existingIds.has(g.id));
       store.games = [...newGames, ...store.games];
       
-      console.log(`已加载 ${newGames.length} 个游戏`);
+      console.log(`已加载 ${newGames.length} 个游戏，包含图集数据`);
     }
     
     // 加载帖子数据
@@ -199,6 +209,44 @@ export async function loadDataFromSupabase() {
   }
 }
 
+// 上传图片到 Supabase Storage
+async function uploadImageToStorage(imageDataUrl, fileName, bucket = 'game-gallery') {
+  try {
+    // 将 base64 转换为 Blob
+    const response = await fetch(imageDataUrl);
+    const blob = await response.blob();
+    
+    // 生成唯一文件名
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const fileExtension = blob.type.split('/')[1] || 'jpg';
+    const uniqueFileName = `${timestamp}_${randomId}_${fileName}.${fileExtension}`;
+    
+    // 上传到 Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(uniqueFileName, blob, {
+        contentType: blob.type,
+        upsert: false
+      });
+    
+    if (error) {
+      console.error('上传图片失败:', error);
+      return null;
+    }
+    
+    // 获取公开 URL
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(uniqueFileName);
+    
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('上传图片过程中出错:', error);
+    return null;
+  }
+}
+
 export async function addGame(game) {
   const id = newId('g');
   const title = game.title?.trim() || '未命名游戏';
@@ -213,7 +261,9 @@ export async function addGame(game) {
   const gallery = parseGallery(game.gallery);
   const creatorName = store.user?.name || '匿名';
   
-  let supabaseGameId = null; // 保存Supabase返回的游戏ID
+  let supabaseGameId = null;
+  let coverUrl = cover; // 默认使用原始封面
+  let galleryUrls = []; // 存储上传后的图片 URL
   
   // 1. 首先保存到本地
   const newGame = {
@@ -230,13 +280,44 @@ export async function addGame(game) {
     gallery,
     createdAt: Date.now(),
     creator: creatorName,
-    supabase_id: null // 添加supabase_id字段
+    supabase_id: null
   };
   store.games.unshift(newGame);
   
-  // 2. 然后保存到 Supabase
+  // 2. 上传图片到 Supabase Storage
   try {
-    // 获取当前登录用户的ID
+    // 上传封面图片
+    if (cover && cover.startsWith('data:')) {
+      console.log('正在上传封面图片...');
+      coverUrl = await uploadImageToStorage(cover, `cover_${title}`, 'game-gallery');
+      if (coverUrl) {
+        newGame.cover = coverUrl; // 更新本地封面 URL
+      }
+    }
+    
+    // 上传图集图片
+    if (gallery && gallery.length > 0) {
+      console.log(`正在上传 ${gallery.length} 张图集图片...`);
+      for (let i = 0; i < gallery.length; i++) {
+        const imageDataUrl = gallery[i];
+        if (imageDataUrl && imageDataUrl.startsWith('data:')) {
+          const uploadedUrl = await uploadImageToStorage(imageDataUrl, `gallery_${title}_${i}`, 'game-gallery');
+          if (uploadedUrl) {
+            galleryUrls.push(uploadedUrl);
+          }
+        }
+      }
+      // 更新本地图集 URL
+      if (galleryUrls.length > 0) {
+        newGame.gallery = galleryUrls;
+      }
+    }
+  } catch (error) {
+    console.error('上传图片时出错:', error);
+  }
+  
+  // 3. 保存游戏信息到 Supabase
+  try {
     const currentUserId = store.user?.id;
     
     const { data, error } = await supabase
@@ -246,12 +327,12 @@ export async function addGame(game) {
           title: title,
           company: company,
           price: price,
-          genres: genres, // 使用数组格式
+          genres: genres,
           background: background,
           gameplay: gameplay,
           official_url: officialUrl,
-          cover_url: cover,
-          creator: currentUserId, // 关联到用户ID
+          cover_url: coverUrl, // 使用上传后的封面 URL
+          creator: currentUserId,
           created_at: new Date().toISOString()
         }
       ])
@@ -259,17 +340,36 @@ export async function addGame(game) {
     
     if (error) {
       console.error('保存游戏到Supabase失败:', error);
-      // 即使Supabase保存失败，也返回本地ID，保证用户体验
       return { localId: id, supabaseId: null };
     }
     
     console.log('游戏已保存到Supabase:', data);
     
-    // 保存Supabase返回的UUID
     if (data && data.length > 0) {
       supabaseGameId = data[0].id;
-      // 更新本地游戏的supabase_id字段
       newGame.supabase_id = supabaseGameId;
+      
+      // 4. 保存图集到 game_images 表
+      if (galleryUrls.length > 0) {
+        console.log(`正在保存 ${galleryUrls.length} 张图片到图集表...`);
+        const imageRecords = galleryUrls.map((url, index) => ({
+          game_id: supabaseGameId,
+          image_url: url,
+          position: index,
+          created_at: new Date().toISOString()
+        }));
+        
+        const { data: imageData, error: imageError } = await supabase
+          .from('game_images')
+          .insert(imageRecords)
+          .select();
+        
+        if (imageError) {
+          console.error('保存图集到数据库失败:', imageError);
+        } else {
+          console.log('图集已保存到数据库:', imageData);
+        }
+      }
     }
     
   } catch (error) {
