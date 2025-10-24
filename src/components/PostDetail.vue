@@ -86,7 +86,7 @@
 <script setup>
 import { reactive, computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { getPost, addComment, likePost } from '../store';
+import { getPost, addComment, likePost, store, supabase } from '../store';
 
 const route = useRoute();
 const post = computed(() => {
@@ -95,6 +95,12 @@ const post = computed(() => {
   if (foundPost) {
     console.log('当前帖子数据:', foundPost);
     console.log('帖子图片:', foundPost.images);
+    
+    // 如果帖子有 Supabase ID 但没有图片，尝试重新加载
+    if (foundPost.supabase_id && (!foundPost.images || foundPost.images.length === 0)) {
+      console.log('检测到帖子缺少图片数据，尝试重新加载...');
+      loadPostImages(foundPost);
+    }
   }
   return foundPost;
 });
@@ -165,6 +171,43 @@ function nextImage() {
   if (post.value && currentImageIndex.value < post.value.images.length - 1) {
     currentImageIndex.value++;
     currentImage.value = post.value.images[currentImageIndex.value];
+  }
+}
+
+// 重新加载帖子图片
+async function loadPostImages(postData) {
+  if (!postData.supabase_id) return;
+  
+  try {
+    console.log('从数据库加载帖子图片:', postData.supabase_id);
+    
+    // 从 Supabase 加载图片数据
+    const { data: imageData, error } = await supabase
+      .from('post_images')
+      .select('image_url, position')
+      .eq('post_id', postData.supabase_id)
+      .order('position');
+    
+    if (error) {
+      console.error('加载帖子图片失败:', error);
+      return;
+    }
+    
+    if (imageData && imageData.length > 0) {
+      const imageUrls = imageData.map(img => img.image_url);
+      console.log('成功加载帖子图片:', imageUrls);
+      
+      // 更新本地帖子数据
+      postData.images = imageUrls;
+      
+      // 强制触发响应式更新
+      const postIndex = store.posts.findIndex(p => p.id === postData.id);
+      if (postIndex !== -1) {
+        store.posts[postIndex] = { ...postData };
+      }
+    }
+  } catch (error) {
+    console.error('加载帖子图片过程中出错:', error);
   }
 }
 </script>

@@ -611,6 +611,9 @@ export async function addPost(post) {
     console.error('保存帖子过程中出错:', error);
   }
   
+  // 确保本地数据已更新
+  console.log('最终本地帖子数据:', newPost);
+  
   return { localId: id, supabaseId: supabasePostId };
 }
 
