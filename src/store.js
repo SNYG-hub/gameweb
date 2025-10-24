@@ -14,7 +14,60 @@ function load() {
 }
 
 function save(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    // 创建一个轻量级的状态副本，移除大型数据
+    const lightState = {
+      ...state,
+      games: state.games.map(game => ({
+        ...game,
+        // 如果图片是 base64 数据，则不保存到 localStorage
+        cover: game.cover && game.cover.startsWith('data:') ? '' : game.cover,
+        gallery: game.gallery ? game.gallery.filter(img => !img.startsWith('data:')) : []
+      })),
+      posts: state.posts.map(post => ({
+        ...post,
+        // 移除 base64 图片数据
+        images: post.images ? post.images.filter(img => !img.startsWith('data:')) : []
+      }))
+    };
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(lightState));
+  } catch (error) {
+    console.warn('保存到 localStorage 失败:', error);
+    // 如果仍然失败，尝试只保存基本信息
+    try {
+      const minimalState = {
+        user: state.user,
+        profiles: state.profiles,
+        relations: state.relations,
+        searchGame: state.searchGame,
+        searchForum: state.searchForum,
+        games: state.games.map(g => ({
+          id: g.id,
+          title: g.title,
+          company: g.company,
+          price: g.price,
+          genres: g.genres,
+          creator: g.creator,
+          createdAt: g.createdAt,
+          supabase_id: g.supabase_id
+        })),
+        posts: state.posts.map(p => ({
+          id: p.id,
+          title: p.title,
+          author: p.author,
+          content: p.content,
+          likes: p.likes,
+          createdAt: p.createdAt,
+          supabase_id: p.supabase_id
+        }))
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(minimalState));
+    } catch (finalError) {
+      console.error('无法保存到 localStorage，清除旧数据:', finalError);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
 }
 
 function newId(prefix) {
@@ -209,65 +262,20 @@ export async function loadDataFromSupabase() {
   }
 }
 
-// 确保 Storage 桶存在
-async function ensureBucketExists(bucketName = 'game-gallery') {
-  try {
-    // 检查桶是否存在
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      console.error('检查桶列表失败:', listError);
-      return false;
-    }
-    
-    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
-    
-    if (!bucketExists) {
-      console.log(`创建 Storage 桶: ${bucketName}`);
-      // 创建公开桶
-      const { data, error } = await supabase.storage.createBucket(bucketName, {
-        public: true,
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'],
-        fileSizeLimit: 5242880 // 5MB
-      });
-      
-      if (error) {
-        console.error('创建桶失败:', error);
-        return false;
-      }
-      
-      console.log('桶创建成功:', data);
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('确保桶存在时出错:', error);
-    return false;
-  }
-}
-
 // 上传图片到 Supabase Storage
 async function uploadImageToStorage(imageDataUrl, fileName, bucket = 'game-gallery') {
   try {
-    // 确保桶存在
-    const bucketReady = await ensureBucketExists(bucket);
-    if (!bucketReady) {
-      console.error('Storage 桶不可用');
-      return null;
-    }
-    
     // 将 base64 转换为 Blob
     const response = await fetch(imageDataUrl);
     const blob = await response.blob();
     
-    // 生成唯一文件名（避免中文字符）
+    // 生成安全的文件名（移除中文和特殊字符）
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 15);
     const fileExtension = blob.type.split('/')[1] || 'jpg';
-    const safeName = fileName.replace(/[^a-zA-Z0-9]/g, '_'); // 替换特殊字符
-    const uniqueFileName = `${timestamp}_${randomId}_${safeName}.${fileExtension}`;
-    
-    console.log(`上传文件: ${uniqueFileName}`);
+    // 只使用英文字母、数字、下划线和连字符
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const uniqueFileName = `${timestamp}_${randomId}_${safeFileName}.${fileExtension}`;
     
     // 上传到 Supabase Storage
     const { data, error } = await supabase.storage
@@ -281,8 +289,6 @@ async function uploadImageToStorage(imageDataUrl, fileName, bucket = 'game-galle
       console.error('上传图片失败:', error);
       return null;
     }
-    
-    console.log('上传成功:', data);
     
     // 获取公开 URL
     const { data: urlData } = supabase.storage
@@ -314,7 +320,7 @@ export async function addGame(game) {
   let coverUrl = cover; // 默认使用原始封面
   let galleryUrls = []; // 存储上传后的图片 URL
   
-  // 1. 首先保存到本地
+  // 1. 首先保存到本地（不包含大图片数据，避免 localStorage 配额问题）
   const newGame = {
     id,
     title,
@@ -325,8 +331,8 @@ export async function addGame(game) {
     background,
     gameplay,
     officialUrl,
-    cover,
-    gallery,
+    cover: '', // 暂时为空，等上传后更新
+    gallery: [], // 暂时为空，等上传后更新
     createdAt: Date.now(),
     creator: creatorName,
     supabase_id: null
@@ -338,9 +344,14 @@ export async function addGame(game) {
     // 上传封面图片
     if (cover && cover.startsWith('data:')) {
       console.log('正在上传封面图片...');
-      coverUrl = await uploadImageToStorage(cover, `cover_${title}`, 'game-gallery');
+      // 使用安全的文件名
+      const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+      coverUrl = await uploadImageToStorage(cover, `cover_${safeTitle}`, 'game-gallery');
       if (coverUrl) {
         newGame.cover = coverUrl; // 更新本地封面 URL
+        console.log('封面上传成功:', coverUrl);
+      } else {
+        console.warn('封面上传失败，使用默认图片');
       }
     }
     
@@ -350,15 +361,21 @@ export async function addGame(game) {
       for (let i = 0; i < gallery.length; i++) {
         const imageDataUrl = gallery[i];
         if (imageDataUrl && imageDataUrl.startsWith('data:')) {
-          const uploadedUrl = await uploadImageToStorage(imageDataUrl, `gallery_${title}_${i}`, 'game-gallery');
+          // 使用安全的文件名
+          const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+          const uploadedUrl = await uploadImageToStorage(imageDataUrl, `gallery_${safeTitle}_${i}`, 'game-gallery');
           if (uploadedUrl) {
             galleryUrls.push(uploadedUrl);
+            console.log(`图集 ${i + 1} 上传成功:`, uploadedUrl);
+          } else {
+            console.warn(`图集 ${i + 1} 上传失败`);
           }
         }
       }
       // 更新本地图集 URL
       if (galleryUrls.length > 0) {
         newGame.gallery = galleryUrls;
+        console.log(`成功上传 ${galleryUrls.length} 张图集图片`);
       }
     }
   } catch (error) {
