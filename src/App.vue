@@ -61,7 +61,7 @@
 <script setup>
 import logo from './assets/cyberpunk-logo.svg';
 import { computed, ref, onMounted } from 'vue';
-import { store } from './store';
+import { store, loadDataFromSupabase } from './store';
 const user = computed(() => store.user);
 // 主题切换（赛博朋克风）
 const theme = ref(localStorage.getItem('theme') || 'dark');
@@ -75,7 +75,13 @@ function applyTheme(){
 }
 function toggleTheme(){ theme.value = theme.value === 'dark' ? 'light' : 'dark'; applyTheme(); }
 applyTheme();
-onMounted(applyTheme);
+
+// 应用启动时加载数据
+onMounted(async () => {
+  applyTheme();
+  // 从 Supabase 加载数据
+  await loadDataFromSupabase();
+});
 // 全局布局，仅路由切换
 </script>
 

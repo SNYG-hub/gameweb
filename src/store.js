@@ -107,6 +107,98 @@ export const store = reactive(migrate(persisted));
 
 watch(store, (s) => save(s), { deep: true });
 
+// 从 Supabase 加载数据
+export async function loadDataFromSupabase() {
+  try {
+    console.log('开始从 Supabase 加载数据...');
+    
+    // 加载游戏数据
+    const { data: gamesData, error: gamesError } = await supabase
+      .from('games')
+      .select(`
+        *,
+        profiles:creator(name, avatar_url)
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (gamesError) {
+      console.error('加载游戏数据失败:', gamesError);
+    } else if (gamesData && gamesData.length > 0) {
+      // 转换 Supabase 数据格式为本地格式
+      const convertedGames = gamesData.map(game => ({
+        id: game.id,
+        title: game.title,
+        company: game.company || '',
+        price: game.price || 0,
+        genres: game.genres || [],
+        background: game.background || '',
+        gameplay: game.gameplay || '',
+        officialUrl: game.official_url || '',
+        cover: game.cover_url || '',
+        gallery: [], // 暂时为空，可以后续扩展
+        createdAt: new Date(game.created_at).getTime(),
+        creator: game.profiles?.name || '匿名',
+        supabase_id: game.id
+      }));
+      
+      // 合并到现有游戏数据中，避免重复
+      const existingIds = new Set(store.games.map(g => g.supabase_id).filter(Boolean));
+      const newGames = convertedGames.filter(g => !existingIds.has(g.id));
+      store.games = [...newGames, ...store.games];
+      
+      console.log(`已加载 ${newGames.length} 个游戏`);
+    }
+    
+    // 加载帖子数据
+    const { data: postsData, error: postsError } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles:author_id(name, avatar_url),
+        comments(
+          *,
+          profiles:author_id(name, avatar_url)
+        )
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (postsError) {
+      console.error('加载帖子数据失败:', postsError);
+    } else if (postsData && postsData.length > 0) {
+      // 转换 Supabase 数据格式为本地格式
+      const convertedPosts = postsData.map(post => ({
+        id: post.id,
+        title: post.title,
+        author: post.author_name || post.profiles?.name || '匿名',
+        content: post.content || '',
+        createdAt: new Date(post.created_at).getTime(),
+        likes: post.likes || 0,
+        images: [], // 暂时为空，可以后续扩展
+        comments: (post.comments || []).map(comment => ({
+          id: comment.id,
+          author: comment.author_name || comment.profiles?.name || '匿名',
+          content: comment.content,
+          createdAt: new Date(comment.created_at).getTime()
+        })),
+        supabase_id: post.id
+      }));
+      
+      // 合并到现有帖子数据中，避免重复
+      const existingPostIds = new Set(store.posts.map(p => p.supabase_id).filter(Boolean));
+      const newPosts = convertedPosts.filter(p => !existingPostIds.has(p.id));
+      store.posts = [...newPosts, ...store.posts];
+      
+      console.log(`已加载 ${newPosts.length} 个帖子`);
+    }
+    
+    console.log('数据加载完成');
+    return true;
+  } catch (error) {
+    console.error('从 Supabase 加载数据时出错:', error);
+    return false;
+  }
+}
+
 export async function addGame(game) {
   const id = newId('g');
   const title = game.title?.trim() || '未命名游戏';
