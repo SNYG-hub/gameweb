@@ -89,7 +89,15 @@ import { useRoute } from 'vue-router';
 import { getPost, addComment, likePost } from '../store';
 
 const route = useRoute();
-const post = computed(() => getPost(route.params.id));
+const post = computed(() => {
+  const foundPost = getPost(route.params.id);
+  // 调试：打印帖子数据
+  if (foundPost) {
+    console.log('当前帖子数据:', foundPost);
+    console.log('帖子图片:', foundPost.images);
+  }
+  return foundPost;
+});
 const comment = reactive({ author: '', content: '' });
 
 // 图片模态框相关
