@@ -6,6 +6,20 @@
     </div>
     <article class="content">{{ post.content }}</article>
 
+    <!-- 帖子图片展示 -->
+    <div class="post-images" v-if="post.images && post.images.length > 0">
+      <div class="image-grid">
+        <div 
+          v-for="(image, index) in post.images" 
+          :key="index" 
+          class="image-item"
+          @click="openImageModal(image, index)"
+        >
+          <img :src="image" :alt="`图片 ${index + 1}`" />
+        </div>
+      </div>
+    </div>
+
     <div class="like-row">
       <button class="btn" @click="onLike">👍 点赞 {{ post.likes || 0 }}</button>
     </div>
@@ -42,16 +56,46 @@
     <h2>未找到该帖子</h2>
     <router-link class="btn" to="/forum">返回论坛</router-link>
   </section>
+
+  <!-- 图片模态框 -->
+  <div v-if="showImageModal" class="image-modal" @click="closeImageModal">
+    <div class="modal-content" @click.stop>
+      <button class="close-btn" @click="closeImageModal">&times;</button>
+      <img :src="currentImage" :alt="`图片 ${currentImageIndex + 1}`" />
+      <div class="image-nav" v-if="post && post.images.length > 1">
+        <button 
+          class="nav-btn prev" 
+          @click="prevImage" 
+          :disabled="currentImageIndex === 0"
+        >
+          &#8249;
+        </button>
+        <span class="image-counter">{{ currentImageIndex + 1 }} / {{ post.images.length }}</span>
+        <button 
+          class="nav-btn next" 
+          @click="nextImage" 
+          :disabled="currentImageIndex === post.images.length - 1"
+        >
+          &#8250;
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { reactive, computed } from 'vue';
+import { reactive, computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { getPost, addComment, likePost } from '../store';
 
 const route = useRoute();
 const post = computed(() => getPost(route.params.id));
 const comment = reactive({ author: '', content: '' });
+
+// 图片模态框相关
+const showImageModal = ref(false);
+const currentImage = ref('');
+const currentImageIndex = ref(0);
 
 function formatTime(ts) {
   const d = new Date(ts);
@@ -81,6 +125,33 @@ function onLike() {
   if (!post.value) return;
   likePost(post.value.id);
 }
+
+// 图片模态框功能
+function openImageModal(image, index) {
+  currentImage.value = image;
+  currentImageIndex.value = index;
+  showImageModal.value = true;
+  document.body.style.overflow = 'hidden'; // 防止背景滚动
+}
+
+function closeImageModal() {
+  showImageModal.value = false;
+  document.body.style.overflow = 'auto';
+}
+
+function prevImage() {
+  if (currentImageIndex.value > 0) {
+    currentImageIndex.value--;
+    currentImage.value = post.value.images[currentImageIndex.value];
+  }
+}
+
+function nextImage() {
+  if (post.value && currentImageIndex.value < post.value.images.length - 1) {
+    currentImageIndex.value++;
+    currentImage.value = post.value.images[currentImageIndex.value];
+  }
+}
 </script>
 
 <style scoped>
@@ -95,4 +166,152 @@ function onLike() {
 .empty { color: var(--muted); }
 .comment-form { margin-top: 8px; }
 .actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* 帖子图片样式 */
+.post-images {
+  margin: 16px 0;
+}
+
+.image-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  max-width: 100%;
+}
+
+.image-item {
+  position: relative;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b1020;
+  border: 1px solid var(--border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.image-item:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.3);
+}
+
+.image-item img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+/* 图片模态框样式 */
+.image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.modal-content img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.close-btn {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.image-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  color: white;
+}
+
+.nav-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.image-counter {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .image-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  
+  .image-item img {
+    height: 150px;
+  }
+  
+  .modal-content {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+  
+  .close-btn {
+    top: -35px;
+    font-size: 20px;
+    width: 28px;
+    height: 28px;
+  }
+}
 </style>
