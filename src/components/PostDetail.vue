@@ -86,7 +86,8 @@
 <script setup>
 import { reactive, computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { getPost, addComment, likePost, store, supabase } from '../store';
+import { getPost, addComment, likePost, store } from '../store';
+import { supabase } from '../supabase';
 
 const route = useRoute();
 const post = computed(() => {
