@@ -11,10 +11,16 @@
 ### 步骤 2：创建 Storage 桶
 
 1. 在左侧菜单点击 **Storage**
-2. 点击 **Create a new bucket**
-3. 桶名称：`game-gallery`
-4. 勾选 **Public bucket** (允许公开访问)
-5. 点击 **Create bucket**
+2. 创建游戏图片桶：
+   - 点击 **Create a new bucket**
+   - 桶名称：`game-gallery`
+   - 勾选 **Public bucket** (允许公开访问)
+   - 点击 **Create bucket**
+3. 创建帖子图片桶：
+   - 点击 **Create a new bucket**
+   - 桶名称：`post-images`
+   - 勾选 **Public bucket** (允许公开访问)
+   - 点击 **Create bucket**
 
 ### 步骤 3：配置 Storage 策略
 
@@ -23,12 +29,17 @@
 3. 复制并粘贴以下 SQL 代码：
 
 ```sql
--- 1. 确保 game-gallery 桶存在且为公开
+-- 1. 确保游戏图片桶存在且为公开
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('game-gallery', 'game-gallery', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
 
--- 2. 允许已认证用户上传文件
+-- 2. 确保帖子图片桶存在且为公开
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('post-images', 'post-images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- 3. 游戏图片桶策略
 CREATE POLICY "Allow authenticated users to upload to game-gallery" 
 ON storage.objects FOR INSERT 
 WITH CHECK (
@@ -36,24 +47,49 @@ WITH CHECK (
   auth.role() = 'authenticated'
 );
 
--- 3. 允许所有人查看文件（公开访问）
 CREATE POLICY "Allow public access to game-gallery" 
 ON storage.objects FOR SELECT 
 USING (bucket_id = 'game-gallery');
 
--- 4. 允许用户更新自己的文件
-CREATE POLICY "Allow users to update own files in game-gallery" 
+-- 4. 帖子图片桶策略
+CREATE POLICY "Allow authenticated users to upload to post-images" 
+ON storage.objects FOR INSERT 
+WITH CHECK (
+  bucket_id = 'post-images' AND 
+  auth.role() = 'authenticated'
+);
+
+CREATE POLICY "Allow public access to post-images" 
+ON storage.objects FOR SELECT 
+USING (bucket_id = 'post-images');
+
+-- 5. 允许用户管理自己的文件（游戏图片）
+CREATE POLICY "Allow users to update own game files" 
 ON storage.objects FOR UPDATE 
 USING (
   bucket_id = 'game-gallery' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
--- 5. 允许用户删除自己的文件
-CREATE POLICY "Allow users to delete own files in game-gallery" 
+CREATE POLICY "Allow users to delete own game files" 
 ON storage.objects FOR DELETE 
 USING (
   bucket_id = 'game-gallery' AND 
+  auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- 6. 允许用户管理自己的文件（帖子图片）
+CREATE POLICY "Allow users to update own post files" 
+ON storage.objects FOR UPDATE 
+USING (
+  bucket_id = 'post-images' AND 
+  auth.uid()::text = (storage.foldername(name))[1]
+);
+
+CREATE POLICY "Allow users to delete own post files" 
+ON storage.objects FOR DELETE 
+USING (
+  bucket_id = 'post-images' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 ```
@@ -63,17 +99,24 @@ USING (
 ### 步骤 4：验证配置
 
 1. 回到 **Storage** 页面
-2. 确认 `game-gallery` 桶已创建
-3. 桶应该显示为 **Public**
+2. 确认以下桶已创建：
+   - `game-gallery` (游戏图片)
+   - `post-images` (帖子图片)
+3. 两个桶都应该显示为 **Public**
 
 ### 步骤 5：测试上传
 
 现在重新访问你的网站：`https://gameweb-po34.vercel.app/`
 
 1. 登录账号
-2. 创建新游戏
-3. 上传图片
-4. 提交游戏
+2. **测试游戏图片上传**：
+   - 创建新游戏
+   - 上传封面和图集图片
+   - 提交游戏
+3. **测试帖子图片上传**：
+   - 发布新帖
+   - 上传配图
+   - 提交帖子
 
 ## 🔍 故障排除
 
@@ -118,10 +161,18 @@ VALUES (
 ## ✅ 成功标志
 
 配置成功后，你应该看到：
-- 图片成功上传到 Supabase Storage
+
+**游戏图片功能**：
+- 游戏图片成功上传到 `game-gallery` 桶
 - `games` 表中的 `cover_url` 字段有正确的 URL
 - `game_images` 表中有图集记录
-- 图片在网站上正常显示
+- 游戏详情页图片正常显示
+
+**帖子图片功能**：
+- 帖子图片成功上传到 `post-images` 桶
+- `post_images` 表中有图片记录
+- 论坛列表和帖子详情页图片都正常显示
+- 跨设备访问时图片同步正常
 
 ## 📞 需要帮助？
 
