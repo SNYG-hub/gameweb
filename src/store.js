@@ -269,13 +269,14 @@ async function uploadImageToStorage(imageDataUrl, fileName, bucket = 'game-galle
     const response = await fetch(imageDataUrl);
     const blob = await response.blob();
     
-    // 生成安全的文件名（移除中文和特殊字符）
+    // 生成简单安全的文件名
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 15);
     const fileExtension = blob.type.split('/')[1] || 'jpg';
-    // 只使用英文字母、数字、下划线和连字符
-    const safeFileName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const uniqueFileName = `${timestamp}_${randomId}_${safeFileName}.${fileExtension}`;
+    // 使用简单的文件名格式，避免复杂路径
+    const uniqueFileName = `${timestamp}-${randomId}.${fileExtension}`;
+    
+    console.log('尝试上传文件:', uniqueFileName);
     
     // 上传到 Supabase Storage
     const { data, error } = await supabase.storage
@@ -287,6 +288,36 @@ async function uploadImageToStorage(imageDataUrl, fileName, bucket = 'game-galle
     
     if (error) {
       console.error('上传图片失败:', error);
+      console.error('错误详情:', error.message);
+      
+      // 如果是 RLS 策略问题，尝试使用用户 ID 作为文件夹
+      if (error.message.includes('row-level security policy')) {
+        const userId = store.user?.id;
+        if (userId) {
+          const userFileName = `${userId}/${uniqueFileName}`;
+          console.log('尝试使用用户文件夹:', userFileName);
+          
+          const { data: userData, error: userError } = await supabase.storage
+            .from(bucket)
+            .upload(userFileName, blob, {
+              contentType: blob.type,
+              upsert: false
+            });
+          
+          if (userError) {
+            console.error('用户文件夹上传也失败:', userError);
+            return null;
+          }
+          
+          // 获取公开 URL
+          const { data: urlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(userFileName);
+          
+          return urlData.publicUrl;
+        }
+      }
+      
       return null;
     }
     
