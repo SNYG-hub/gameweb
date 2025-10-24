@@ -8,7 +8,7 @@
 
     <!-- 帖子图片展示 -->
     <div class="post-images" v-if="post.images && post.images.length > 0">
-      <div class="image-grid">
+      <div class="image-grid" :class="getImageGridClass(post.images.length)">
         <div 
           v-for="(image, index) in post.images" 
           :key="index" 
@@ -126,7 +126,14 @@ function onLike() {
   likePost(post.value.id);
 }
 
-// 图片模态框功能
+// 图片相关函数
+function getImageGridClass(imageCount) {
+  if (imageCount === 1) return 'single';
+  if (imageCount === 2) return 'double';
+  if (imageCount <= 4) return 'quad';
+  return 'grid';
+}
+
 function openImageModal(image, index) {
   currentImage.value = image;
   currentImageIndex.value = index;
@@ -136,7 +143,7 @@ function openImageModal(image, index) {
 
 function closeImageModal() {
   showImageModal.value = false;
-  document.body.style.overflow = 'auto';
+  document.body.style.overflow = ''; // 恢复滚动
 }
 
 function prevImage() {
@@ -175,15 +182,35 @@ function nextImage() {
 .image-grid {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  max-width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.image-grid.single {
+  grid-template-columns: 1fr;
+  max-width: 400px;
+}
+
+.image-grid.double {
+  grid-template-columns: 1fr 1fr;
+  max-width: 500px;
+}
+
+.image-grid.quad {
+  grid-template-columns: 1fr 1fr;
+  max-width: 400px;
+}
+
+.image-grid.grid {
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 450px;
 }
 
 .image-item {
   position: relative;
   cursor: pointer;
-  border-radius: 8px;
   overflow: hidden;
+  border-radius: 8px;
   background: #0b1020;
   border: 1px solid var(--border);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -196,9 +223,13 @@ function nextImage() {
 
 .image-item img {
   width: 100%;
-  height: 200px;
+  height: 150px;
   object-fit: cover;
   display: block;
+}
+
+.image-grid.single .image-item img {
+  height: 250px;
 }
 
 /* 图片模态框样式 */
@@ -290,28 +321,5 @@ function nextImage() {
 .image-counter {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .image-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-  
-  .image-item img {
-    height: 150px;
-  }
-  
-  .modal-content {
-    max-width: 95vw;
-    max-height: 95vh;
-  }
-  
-  .close-btn {
-    top: -35px;
-    font-size: 20px;
-    width: 28px;
-    height: 28px;
-  }
 }
 </style>
