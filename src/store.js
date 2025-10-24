@@ -212,12 +212,13 @@ export async function loadDataFromSupabase() {
       console.log(`已加载 ${newGames.length} 个游戏，包含图集数据`);
     }
     
-    // 加载帖子数据
+    // 加载帖子数据（包含图片）
     const { data: postsData, error: postsError } = await supabase
       .from('posts')
       .select(`
         *,
         profiles:author_id(name, avatar_url),
+        post_images(image_url, position),
         comments(
           *,
           profiles:author_id(name, avatar_url)
@@ -229,29 +230,38 @@ export async function loadDataFromSupabase() {
       console.error('加载帖子数据失败:', postsError);
     } else if (postsData && postsData.length > 0) {
       // 转换 Supabase 数据格式为本地格式
-      const convertedPosts = postsData.map(post => ({
-        id: post.id,
-        title: post.title,
-        author: post.author_name || post.profiles?.name || '匿名',
-        content: post.content || '',
-        createdAt: new Date(post.created_at).getTime(),
-        likes: post.likes || 0,
-        images: [], // 暂时为空，可以后续扩展
-        comments: (post.comments || []).map(comment => ({
-          id: comment.id,
-          author: comment.author_name || comment.profiles?.name || '匿名',
-          content: comment.content,
-          createdAt: new Date(comment.created_at).getTime()
-        })),
-        supabase_id: post.id
-      }));
+      const convertedPosts = postsData.map(post => {
+        // 处理帖子图片数据
+        const images = post.post_images 
+          ? post.post_images
+              .sort((a, b) => a.position - b.position) // 按位置排序
+              .map(img => img.image_url)
+          : [];
+        
+        return {
+          id: post.id,
+          title: post.title,
+          author: post.author_name || post.profiles?.name || '匿名',
+          content: post.content || '',
+          createdAt: new Date(post.created_at).getTime(),
+          likes: post.likes || 0,
+          images: images, // 从 post_images 表加载的图片
+          comments: (post.comments || []).map(comment => ({
+            id: comment.id,
+            author: comment.author_name || comment.profiles?.name || '匿名',
+            content: comment.content,
+            createdAt: new Date(comment.created_at).getTime()
+          })),
+          supabase_id: post.id
+        };
+      });
       
       // 合并到现有帖子数据中，避免重复
       const existingPostIds = new Set(store.posts.map(p => p.supabase_id).filter(Boolean));
       const newPosts = convertedPosts.filter(p => !existingPostIds.has(p.id));
       store.posts = [...newPosts, ...store.posts];
       
-      console.log(`已加载 ${newPosts.length} 个帖子`);
+      console.log(`已加载 ${newPosts.length} 个帖子，包含图片数据`);
     }
     
     console.log('数据加载完成');
@@ -502,10 +512,12 @@ export async function addPost(post) {
   const authorName = post.author?.trim() || store.user?.name || '匿名';
   const title = post.title?.trim() || '无标题';
   const content = post.content?.trim() || '';
+  const images = Array.isArray(post.images) ? post.images : [];
   
-  let supabasePostId = null; // 保存Supabase返回的帖子ID
+  let supabasePostId = null;
+  let uploadedImageUrls = []; // 存储上传后的图片 URL
   
-  // 1. 首先保存到本地
+  // 1. 首先保存到本地（不包含大图片数据）
   const newPost = {
     id,
     title,
@@ -513,15 +525,38 @@ export async function addPost(post) {
     content,
     createdAt: Date.now(),
     likes: 0,
-    images: Array.isArray(post.images) ? post.images : [],
+    images: [], // 暂时为空，等上传后更新
     comments: [],
-    supabase_id: null // 添加supabase_id字段
+    supabase_id: null
   };
   store.posts.unshift(newPost);
   
-  // 2. 然后保存到 Supabase
+  // 2. 上传图片到 Supabase Storage
+  if (images.length > 0) {
+    console.log(`正在上传 ${images.length} 张帖子图片...`);
+    for (let i = 0; i < images.length; i++) {
+      const imageDataUrl = images[i];
+      if (imageDataUrl && imageDataUrl.startsWith('data:')) {
+        // 使用安全的文件名
+        const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+        const uploadedUrl = await uploadImageToStorage(imageDataUrl, `post_${safeTitle}_${i}`, 'post-images');
+        if (uploadedUrl) {
+          uploadedImageUrls.push(uploadedUrl);
+          console.log(`帖子图片 ${i + 1} 上传成功:`, uploadedUrl);
+        } else {
+          console.warn(`帖子图片 ${i + 1} 上传失败`);
+        }
+      }
+    }
+    // 更新本地帖子的图片 URL
+    if (uploadedImageUrls.length > 0) {
+      newPost.images = uploadedImageUrls;
+      console.log(`成功上传 ${uploadedImageUrls.length} 张帖子图片`);
+    }
+  }
+  
+  // 3. 保存帖子信息到 Supabase
   try {
-    // 获取当前登录用户的ID
     const currentUserId = store.user?.id;
     
     const { data, error } = await supabase
@@ -529,8 +564,8 @@ export async function addPost(post) {
       .insert([
         {
           title: title,
-          author_id: currentUserId, // 关联到用户ID
-          author_name: authorName,  // 保存作者名字快照
+          author_id: currentUserId,
+          author_name: authorName,
           content: content,
           likes: 0,
           created_at: new Date().toISOString()
@@ -540,17 +575,36 @@ export async function addPost(post) {
     
     if (error) {
       console.error('保存帖子到Supabase失败:', error);
-      // 即使Supabase保存失败，也返回本地ID，保证用户体验
       return { localId: id, supabaseId: null };
     }
     
     console.log('帖子已保存到Supabase:', data);
     
-    // 保存Supabase返回的UUID
     if (data && data.length > 0) {
       supabasePostId = data[0].id;
-      // 更新本地帖子的supabase_id字段
       newPost.supabase_id = supabasePostId;
+      
+      // 4. 保存图片到 post_images 表
+      if (uploadedImageUrls.length > 0) {
+        console.log(`正在保存 ${uploadedImageUrls.length} 张图片到帖子图片表...`);
+        const imageRecords = uploadedImageUrls.map((url, index) => ({
+          post_id: supabasePostId,
+          image_url: url,
+          position: index,
+          created_at: new Date().toISOString()
+        }));
+        
+        const { data: imageData, error: imageError } = await supabase
+          .from('post_images')
+          .insert(imageRecords)
+          .select();
+        
+        if (imageError) {
+          console.error('保存帖子图片到数据库失败:', imageError);
+        } else {
+          console.log('帖子图片已保存到数据库:', imageData);
+        }
+      }
     }
     
   } catch (error) {

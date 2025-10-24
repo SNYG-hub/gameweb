@@ -37,3 +37,35 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE storage.buckets 
 SET public = true 
 WHERE id = 'game-gallery';
+
+-- 4. 为 post-images 存储桶创建策略
+
+-- 创建 post-images 桶（如果不存在）
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('post-images', 'post-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 允许已认证用户上传帖子图片
+CREATE POLICY "Allow authenticated users to upload post images" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'post-images' AND 
+    auth.role() = 'authenticated'
+  );
+
+-- 允许所有人查看帖子图片（公开访问）
+CREATE POLICY "Allow public access to post images" ON storage.objects
+  FOR SELECT USING (bucket_id = 'post-images');
+
+-- 允许用户更新自己的帖子图片
+CREATE POLICY "Allow users to update own post images" ON storage.objects
+  FOR UPDATE USING (
+    bucket_id = 'post-images' AND 
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- 允许用户删除自己的帖子图片
+CREATE POLICY "Allow users to delete own post images" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'post-images' AND 
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
