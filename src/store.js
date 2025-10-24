@@ -209,18 +209,65 @@ export async function loadDataFromSupabase() {
   }
 }
 
+// 确保 Storage 桶存在
+async function ensureBucketExists(bucketName = 'game-gallery') {
+  try {
+    // 检查桶是否存在
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error('检查桶列表失败:', listError);
+      return false;
+    }
+    
+    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
+    
+    if (!bucketExists) {
+      console.log(`创建 Storage 桶: ${bucketName}`);
+      // 创建公开桶
+      const { data, error } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'],
+        fileSizeLimit: 5242880 // 5MB
+      });
+      
+      if (error) {
+        console.error('创建桶失败:', error);
+        return false;
+      }
+      
+      console.log('桶创建成功:', data);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('确保桶存在时出错:', error);
+    return false;
+  }
+}
+
 // 上传图片到 Supabase Storage
 async function uploadImageToStorage(imageDataUrl, fileName, bucket = 'game-gallery') {
   try {
+    // 确保桶存在
+    const bucketReady = await ensureBucketExists(bucket);
+    if (!bucketReady) {
+      console.error('Storage 桶不可用');
+      return null;
+    }
+    
     // 将 base64 转换为 Blob
     const response = await fetch(imageDataUrl);
     const blob = await response.blob();
     
-    // 生成唯一文件名
+    // 生成唯一文件名（避免中文字符）
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 15);
     const fileExtension = blob.type.split('/')[1] || 'jpg';
-    const uniqueFileName = `${timestamp}_${randomId}_${fileName}.${fileExtension}`;
+    const safeName = fileName.replace(/[^a-zA-Z0-9]/g, '_'); // 替换特殊字符
+    const uniqueFileName = `${timestamp}_${randomId}_${safeName}.${fileExtension}`;
+    
+    console.log(`上传文件: ${uniqueFileName}`);
     
     // 上传到 Supabase Storage
     const { data, error } = await supabase.storage
@@ -234,6 +281,8 @@ async function uploadImageToStorage(imageDataUrl, fileName, bucket = 'game-galle
       console.error('上传图片失败:', error);
       return null;
     }
+    
+    console.log('上传成功:', data);
     
     // 获取公开 URL
     const { data: urlData } = supabase.storage
