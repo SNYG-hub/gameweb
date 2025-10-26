@@ -2,60 +2,88 @@
   <section class="login-wrap">
     <div class="login-card">
       <div class="left">
-        <h2>{{ isRegister ? '注册' : '登录' }}</h2>
+        <h2>{{ isRegister ? '注册' : isForgotPassword ? '找回密码' : '登录' }}</h2>
         
-        <!-- 切换登录/注册 -->
+        <!-- 切换登录/注册/忘记密码 -->
         <div class="mode-toggle">
-          <button :class="['mode-btn', !isRegister && 'active']" @click="switchToLogin">登录</button>
+          <button :class="['mode-btn', !isRegister && !isForgotPassword && 'active']" @click="switchToLogin">登录</button>
           <button :class="['mode-btn', isRegister && 'active']" @click="switchToRegister">注册</button>
+          <button :class="['mode-btn', isForgotPassword && 'active']" @click="switchToForgotPassword">找回密码</button>
         </div>
 
         <form class="grid" @submit.prevent="onSubmit">
-          <!-- 注册时显示用户名输入 -->
-          <label v-if="isRegister">
-            用户名
-            <input v-model="registerUsername" class="input" placeholder="设置您的用户名" required />
-          </label>
+          <!-- 忘记密码表单 -->
+          <template v-if="isForgotPassword">
+            <div class="forgot-password-info">
+              <p>请输入您的邮箱地址，我们将向您发送密码重置链接。</p>
+            </div>
+            <label>
+              邮箱
+              <input v-model="forgotEmail" class="input" type="email" placeholder="you@example.com" required />
+            </label>
+          </template>
           
-          <!-- 注册时显示邮箱输入 -->
-          <label v-if="isRegister">
-            邮箱
-            <input v-model="registerEmail" class="input" type="email" placeholder="you@example.com" required />
-          </label>
+          <!-- 注册表单 -->
+          <template v-else-if="isRegister">
+            <label>
+              用户名
+              <input v-model="registerUsername" class="input" placeholder="设置您的用户名" required />
+            </label>
+            <label>
+              邮箱
+              <input v-model="registerEmail" class="input" type="email" placeholder="you@example.com" required />
+            </label>
+            <label>
+              密码
+              <input v-model="password" class="input" type="password" placeholder="设置密码（至少6位）" required />
+            </label>
+            <label>
+              确认密码
+              <input v-model="confirmPassword" class="input" type="password" placeholder="再次输入密码" required />
+            </label>
+          </template>
           
-          <!-- 登录时显示邮箱输入 -->
-          <label v-if="!isRegister">
-            邮箱
-            <input v-model="email" class="input" type="email" placeholder="you@example.com" required />
-          </label>
-          
-          <label>
-            密码
-            <input v-model="password" class="input" type="password" :placeholder="isRegister ? '设置密码（至少6位）' : '请输入密码'" required />
-          </label>
-          
-          <!-- 注册时显示确认密码 -->
-          <label v-if="isRegister">
-            确认密码
-            <input v-model="confirmPassword" class="input" type="password" placeholder="再次输入密码" required />
-          </label>
-          
-          <label class="remember" v-if="!isRegister">
-            <input type="checkbox" v-model="remember" />
-            记住我
-          </label>
+          <!-- 登录表单 -->
+          <template v-else>
+            <label>
+              邮箱
+              <input v-model="email" class="input" type="email" placeholder="you@example.com" required />
+            </label>
+            <label>
+              密码
+              <input v-model="password" class="input" type="password" placeholder="请输入密码" required />
+            </label>
+            <label class="remember">
+              <input type="checkbox" v-model="remember" />
+              记住我
+            </label>
+          </template>
           
           <div class="actions">
-            <button class="btn" type="submit">{{ isRegister ? '注册' : '登录' }}</button>
+            <button class="btn" type="submit">
+              {{ isForgotPassword ? '发送重置邮件' : isRegister ? '注册' : '登录' }}
+            </button>
             <router-link class="btn secondary" to="/">返回首页</router-link>
           </div>
         </form>
         
         <div v-if="message" :class="['message', messageType]">{{ message }}</div>
         
-        <small class="help">{{ isRegister ? '已有账号？' : '还没有账号？' }} 
-          <a href="#" @click.prevent="isRegister = !isRegister">{{ isRegister ? '立即登录' : '立即注册' }}</a>
-        </small>
+        <div class="help-links">
+          <small class="help" v-if="!isForgotPassword">
+            {{ isRegister ? '已有账号？' : '还没有账号？' }} 
+            <a href="#" @click.prevent="isRegister = !isRegister">{{ isRegister ? '立即登录' : '立即注册' }}</a>
+          </small>
+          
+          <small class="help" v-if="!isRegister && !isForgotPassword">
+            <a href="#" @click.prevent="switchToForgotPassword">忘记密码？</a>
+          </small>
+          
+          <small class="help" v-if="isForgotPassword">
+            想起密码了？ 
+            <a href="#" @click.prevent="switchToLogin">返回登录</a>
+          </small>
+        </div>
       </div>
     </div>
   </section>
@@ -64,38 +92,49 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { signIn, signUp } from '../store';
+import { signIn, signUp, sendPasswordResetEmail } from '../store';
 
 const router = useRouter();
 const isRegister = ref(false);
+const isForgotPassword = ref(false);
 const email = ref('');
 const password = ref('');
 const remember = ref(true);
 const registerUsername = ref('');
 const registerEmail = ref('');
 const confirmPassword = ref('');
+const forgotEmail = ref('');
 const message = ref('');
 const messageType = ref(''); // 'success' | 'error'
 
 function switchToLogin() {
   isRegister.value = false;
+  isForgotPassword.value = false;
   clearForm();
   clearMessage();
 }
 
 function switchToRegister() {
   isRegister.value = true;
+  isForgotPassword.value = false;
+  clearForm();
+  clearMessage();
+}
+
+function switchToForgotPassword() {
+  isRegister.value = false;
+  isForgotPassword.value = true;
   clearForm();
   clearMessage();
 }
 
 function clearForm() {
   email.value = '';
-  username.value = '';
   password.value = '';
   registerUsername.value = '';
   registerEmail.value = '';
   confirmPassword.value = '';
+  forgotEmail.value = '';
 }
 
 function clearMessage() {
@@ -112,7 +151,25 @@ function showMessage(text, type = 'error') {
 }
 
 async function onSubmit() {
-  if (isRegister.value) {
+  if (isForgotPassword.value) {
+    // 忘记密码逻辑
+    if (!forgotEmail.value.trim() || !forgotEmail.value.includes('@')) {
+      showMessage('请输入有效的邮箱地址');
+      return;
+    }
+    
+    try {
+      await sendPasswordResetEmail(forgotEmail.value.trim());
+      showMessage('密码重置邮件已发送！请检查您的邮箱并点击重置链接。', 'success');
+      // 3秒后自动切换回登录页面
+      setTimeout(() => {
+        switchToLogin();
+      }, 3000);
+    } catch (error) {
+      console.error('发送重置邮件错误:', error);
+      showMessage(error.message || '发送重置邮件失败，请稍后重试');
+    }
+  } else if (isRegister.value) {
     // 注册逻辑
     if (!registerUsername.value.trim()) {
       showMessage('请输入用户名');
@@ -223,11 +280,40 @@ async function onSubmit() {
   background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444;
 }
 
-.help { display: block; color: var(--muted); margin-top: 8px; }
-.help a {
-  color: var(--primary); text-decoration: none;
+.help-links {
+  margin-top: 12px;
 }
+
+.help { 
+  display: block; 
+  color: var(--muted); 
+  margin-top: 8px; 
+  font-size: 14px;
+}
+
+.help a {
+  color: var(--primary); 
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
 .help a:hover {
   text-decoration: underline;
+  color: #93c5fd;
+}
+
+.forgot-password-info {
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.forgot-password-info p {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
 }
 </style>

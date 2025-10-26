@@ -917,6 +917,52 @@ export function signOut() {
   store.user = null;
 }
 
+// 发送密码重置邮件
+export async function sendPasswordResetEmail(email) {
+  try {
+    if (!email || !email.includes('@')) {
+      throw new Error('请输入有效的邮箱地址');
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    });
+
+    if (error) {
+      console.error('发送密码重置邮件失败:', error);
+      throw new Error(error.message || '发送重置邮件失败');
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('发送密码重置邮件时出错:', error);
+    throw error;
+  }
+}
+
+// 重置密码
+export async function resetPassword(newPassword) {
+  try {
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('密码至少需要6位');
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      console.error('重置密码失败:', error);
+      throw new Error(error.message || '重置密码失败');
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('重置密码时出错:', error);
+    throw error;
+  }
+}
+
 /* 头像与社交关系 */
 export function updateAvatar(dataUrl) {
   if (!store.user) return false;

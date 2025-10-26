@@ -7,6 +7,7 @@ import PostForm from '../components/PostForm.vue';
 import PostDetail from '../components/PostDetail.vue';
 import Rank from '../components/Rank.vue';
 import Auth from '../components/Auth.vue';
+import ResetPassword from '../components/ResetPassword.vue';
 import Profile from '../components/Profile.vue';
 import Following from '../components/Following.vue';
 import Followers from '../components/Followers.vue';
@@ -20,6 +21,7 @@ const routes = [
   { path: '/forum/post/:id', name: 'post-detail', component: PostDetail, props: true },
   { path: '/rank', name: 'rank', component: Rank },
   { path: '/auth', name: 'auth', component: Auth },
+  { path: '/reset-password', name: 'reset-password', component: ResetPassword },
   { path: '/profile', name: 'profile', component: Profile },
   { path: '/profile/following', name: 'profile-following', component: Following },
   { path: '/profile/followers', name: 'profile-followers', component: Followers },
