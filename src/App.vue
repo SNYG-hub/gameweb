@@ -159,9 +159,15 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border); border-radius: 6px; padding: 10px; outline: none;
 }
 .input:focus, .textarea:focus, .select:focus { border-color: var(--primary); }
-.btn { background: var(--primary); color: #06142a; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; }
+.btn { background: var(--primary); color: #06142a; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
 .btn.secondary { background: var(--accent); }
-.btn:hover { filter: brightness(1.05); }
+.btn:hover:not(:disabled) { filter: brightness(1.05); }
+.btn:disabled { 
+  background: #6b7280; 
+  cursor: not-allowed; 
+  opacity: 0.7; 
+  filter: none;
+}
 .btn.small { padding: 6px 10px; font-size: 12px; }
 .btn.toggle-theme { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 999px; box-shadow: 0 0 10px rgba(0,229,255,.35), 0 0 10px rgba(255,0,170,.25) inset; }
 .btn.toggle-theme:hover { border-color: var(--primary); box-shadow: 0 0 12px rgba(0,229,255,.45), 0 0 12px rgba(255,0,170,.35) inset; }

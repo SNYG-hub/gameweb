@@ -48,7 +48,13 @@
       </label>
 
       <div class="actions">
-        <button class="btn" type="submit">提交</button>
+        <button 
+          class="btn" 
+          type="submit" 
+          :disabled="isSubmitting"
+        >
+          {{ isSubmitting ? '提交中...' : '提交' }}
+        </button>
         <router-link class="btn secondary" to="/">返回目录</router-link>
       </div>
       </form>
@@ -57,11 +63,12 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { addGame } from '../store';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
+const isSubmitting = ref(false);
 const types = [
   '动作游戏','角色扮演游戏','模拟游戏','策略游戏','休闲游戏','益智游戏',
   '射击游戏','体育游戏','竞速游戏','音乐游戏'
@@ -105,13 +112,30 @@ async function onGalleryChange(e) {
 }
 
 async function onSubmit() {
+  if (isSubmitting.value) return; // 防止重复提交
+  
+  // 基本验证
+  if (!form.title.trim()) {
+    alert('请输入游戏名称');
+    return;
+  }
+  
+  if (form.genres.length === 0) {
+    alert('请至少选择一个游戏类型');
+    return;
+  }
+  
+  isSubmitting.value = true;
+  
   try {
     const result = await addGame(form);
     // 使用本地ID进行路由跳转
     router.push(`/game/${result.localId}`);
   } catch (error) {
     console.error('添加游戏失败:', error);
-    // 可以在这里添加错误提示
+    alert('添加游戏失败，请稍后重试');
+  } finally {
+    isSubmitting.value = false;
   }
 }
 </script>

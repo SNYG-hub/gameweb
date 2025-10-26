@@ -60,8 +60,12 @@
           </template>
           
           <div class="actions">
-            <button class="btn" type="submit">
-              {{ isForgotPassword ? '发送重置邮件' : isRegister ? '注册' : '登录' }}
+            <button 
+              class="btn" 
+              type="submit" 
+              :disabled="isSubmitting || (isForgotPassword && resetEmailCooldown > 0)"
+            >
+              {{ getSubmitButtonText() }}
             </button>
             <router-link class="btn secondary" to="/">返回首页</router-link>
           </div>
@@ -90,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { signIn, signUp, sendPasswordResetEmail } from '../store';
 
@@ -106,6 +110,9 @@ const confirmPassword = ref('');
 const forgotEmail = ref('');
 const message = ref('');
 const messageType = ref(''); // 'success' | 'error'
+const isSubmitting = ref(false);
+const resetEmailCooldown = ref(0);
+let cooldownTimer = null;
 
 function switchToLogin() {
   isRegister.value = false;
@@ -135,6 +142,9 @@ function clearForm() {
   registerEmail.value = '';
   confirmPassword.value = '';
   forgotEmail.value = '';
+  isSubmitting.value = false;
+  resetEmailCooldown.value = 0;
+  cleanup();
 }
 
 function clearMessage() {
@@ -150,7 +160,54 @@ function showMessage(text, type = 'error') {
   }, 3000);
 }
 
+function getSubmitButtonText() {
+  if (isSubmitting.value) {
+    if (isForgotPassword.value) return '发送中...';
+    if (isRegister.value) return '注册中...';
+    return '登录中...';
+  }
+  
+  if (isForgotPassword.value && resetEmailCooldown.value > 0) {
+    return `请等待 ${resetEmailCooldown.value}s`;
+  }
+  
+  if (isForgotPassword.value) return '发送重置邮件';
+  if (isRegister.value) return '注册';
+  return '登录';
+}
+
+function startResetEmailCooldown() {
+  resetEmailCooldown.value = 60;
+  
+  if (cooldownTimer) {
+    clearInterval(cooldownTimer);
+  }
+  
+  cooldownTimer = setInterval(() => {
+    resetEmailCooldown.value--;
+    if (resetEmailCooldown.value <= 0) {
+      clearInterval(cooldownTimer);
+      cooldownTimer = null;
+    }
+  }, 1000);
+}
+
+// 清理定时器
+function cleanup() {
+  if (cooldownTimer) {
+    clearInterval(cooldownTimer);
+    cooldownTimer = null;
+  }
+}
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  cleanup();
+});
+
 async function onSubmit() {
+  if (isSubmitting.value) return; // 防止重复提交
+  
   if (isForgotPassword.value) {
     // 忘记密码逻辑
     if (!forgotEmail.value.trim() || !forgotEmail.value.includes('@')) {
@@ -158,9 +215,18 @@ async function onSubmit() {
       return;
     }
     
+    if (resetEmailCooldown.value > 0) {
+      showMessage(`请等待 ${resetEmailCooldown.value} 秒后再试`);
+      return;
+    }
+    
+    isSubmitting.value = true;
+    
     try {
       await sendPasswordResetEmail(forgotEmail.value.trim());
       showMessage('密码重置邮件已发送！请检查您的邮箱并点击重置链接。', 'success');
+      startResetEmailCooldown(); // 开始60秒冷却时间
+      
       // 3秒后自动切换回登录页面
       setTimeout(() => {
         switchToLogin();
@@ -168,6 +234,8 @@ async function onSubmit() {
     } catch (error) {
       console.error('发送重置邮件错误:', error);
       showMessage(error.message || '发送重置邮件失败，请稍后重试');
+    } finally {
+      isSubmitting.value = false;
     }
   } else if (isRegister.value) {
     // 注册逻辑
@@ -192,6 +260,8 @@ async function onSubmit() {
       return;
     }
     
+    isSubmitting.value = true;
+    
     try {
       const ok = await signUp({
         username: registerUsername.value.trim(),
@@ -208,6 +278,8 @@ async function onSubmit() {
     } catch (error) {
       console.error('注册错误:', error);
       showMessage('注册过程中出现错误，请稍后重试');
+    } finally {
+      isSubmitting.value = false;
     }
   } else {
     // 登录逻辑 - 只使用邮箱登录
@@ -220,6 +292,8 @@ async function onSubmit() {
       return;
     }
     
+    isSubmitting.value = true;
+    
     try {
       const ok = await signIn({ email: email.value, password: password.value }, { remember: remember.value });
       if (ok) {
@@ -230,6 +304,8 @@ async function onSubmit() {
     } catch (error) {
       console.error('登录错误:', error);
       showMessage('登录过程中出现错误，请稍后重试');
+    } finally {
+      isSubmitting.value = false;
     }
   }
 }

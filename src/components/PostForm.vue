@@ -23,7 +23,13 @@
         <img v-for="(img,i) in form.images" :key="i" :src="img" alt="" />
       </div>
       <div class="actions">
-        <button class="btn" type="submit">发布</button>
+        <button 
+          class="btn" 
+          type="submit" 
+          :disabled="isSubmitting"
+        >
+          {{ isSubmitting ? '发布中...' : '发布' }}
+        </button>
         <router-link class="btn secondary" to="/forum">返回论坛</router-link>
       </div>
       </form>
@@ -32,11 +38,12 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { addPost } from '../store';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
+const isSubmitting = ref(false);
 const form = reactive({
   title: '',
   author: '',
@@ -45,13 +52,30 @@ const form = reactive({
 });
 
 async function onSubmit() {
+  if (isSubmitting.value) return; // 防止重复提交
+  
+  // 基本验证
+  if (!form.title.trim()) {
+    alert('请输入标题');
+    return;
+  }
+  
+  if (!form.content.trim()) {
+    alert('请输入内容');
+    return;
+  }
+  
+  isSubmitting.value = true;
+  
   try {
     const result = await addPost(form);
     // 使用本地ID进行路由跳转
     router.push(`/forum/post/${result.localId}`);
   } catch (error) {
     console.error('发布帖子失败:', error);
-    // 可以在这里添加错误提示
+    alert('发布帖子失败，请稍后重试');
+  } finally {
+    isSubmitting.value = false;
   }
 }
 function onPickImages(e) {
