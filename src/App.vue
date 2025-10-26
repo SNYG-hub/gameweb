@@ -39,6 +39,15 @@
       <div class="user-actions">
         <template v-if="user">
           <span class="user-name">你好，{{ user.name }}</span>
+          <!-- 审核员按钮 -->
+          <router-link v-if="user.is_moderator" class="btn small moderator-btn" to="/moderation">
+            审核
+          </router-link>
+          <!-- 私信按钮 -->
+          <router-link class="btn small messages-btn" to="/messages">
+            私信
+            <span v-if="unreadCount > 0" class="unread-badge">{{ unreadCount }}</span>
+          </router-link>
           <router-link class="btn small" to="/profile">个人中心</router-link>
         </template>
         <template v-else>
@@ -60,9 +69,12 @@
 
 <script setup>
 import logo from './assets/cyberpunk-logo.svg';
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { store, loadDataFromSupabase } from './store';
+import { supabase } from './supabase';
+
 const user = computed(() => store.user);
+const unreadCount = ref(0);
 // 主题切换（赛博朋克风）
 const theme = ref(localStorage.getItem('theme') || 'dark');
 const themeLabel = computed(() => theme.value === 'dark' ? '赛博亮' : '赛博暗');
@@ -75,6 +87,39 @@ function applyTheme(){
 }
 function toggleTheme(){ theme.value = theme.value === 'dark' ? 'light' : 'dark'; applyTheme(); }
 applyTheme();
+
+// 获取未读消息数
+async function loadUnreadCount() {
+  if (!user.value?.id) {
+    unreadCount.value = 0;
+    return;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('receiver_id', user.value.id)
+      .eq('is_read', false);
+
+    if (!error) {
+      unreadCount.value = data?.length || 0;
+    }
+  } catch (error) {
+    console.error('获取未读消息数失败:', error);
+  }
+}
+
+// 监听用户登录状态变化
+watch(user, async (newUser) => {
+  if (newUser) {
+    await loadUnreadCount();
+    // 设置定时器定期更新未读消息数
+    setInterval(loadUnreadCount, 30000); // 每30秒更新一次
+  } else {
+    unreadCount.value = 0;
+  }
+}, { immediate: true });
 
 // 应用启动时加载数据
 onMounted(async () => {
@@ -171,6 +216,35 @@ a:hover { text-decoration: underline; }
 .btn.small { padding: 6px 10px; font-size: 12px; }
 .btn.toggle-theme { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 999px; box-shadow: 0 0 10px rgba(0,229,255,.35), 0 0 10px rgba(255,0,170,.25) inset; }
 .btn.toggle-theme:hover { border-color: var(--primary); box-shadow: 0 0 12px rgba(0,229,255,.45), 0 0 12px rgba(255,0,170,.35) inset; }
+
+/* 私信和审核按钮样式 */
+.messages-btn {
+  position: relative;
+}
+
+.unread-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.moderator-btn {
+  background: #f59e0b;
+  color: white;
+}
+
+.moderator-btn:hover {
+  background: #d97706;
+}
 .grid { display: grid; gap: 12px; }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }

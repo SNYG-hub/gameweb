@@ -477,6 +477,26 @@ export async function addGame(game) {
           console.log('图集已保存到数据库:', imageData);
         }
       }
+      
+      // 5. 添加到审核队列
+      try {
+        const { error: queueError } = await supabase
+          .from('moderation_queue')
+          .insert([{
+            content_type: 'game',
+            content_id: supabaseGameId,
+            submitter_id: currentUserId,
+            created_at: new Date().toISOString()
+          }]);
+        
+        if (queueError) {
+          console.error('添加到审核队列失败:', queueError);
+        } else {
+          console.log('游戏已添加到审核队列');
+        }
+      } catch (error) {
+        console.error('添加到审核队列时出错:', error);
+      }
     }
     
   } catch (error) {
@@ -604,6 +624,26 @@ export async function addPost(post) {
         } else {
           console.log('帖子图片已保存到数据库:', imageData);
         }
+      }
+      
+      // 5. 添加到审核队列
+      try {
+        const { error: queueError } = await supabase
+          .from('moderation_queue')
+          .insert([{
+            content_type: 'post',
+            content_id: supabasePostId,
+            submitter_id: currentUserId,
+            created_at: new Date().toISOString()
+          }]);
+        
+        if (queueError) {
+          console.error('添加到审核队列失败:', queueError);
+        } else {
+          console.log('帖子已添加到审核队列');
+        }
+      } catch (error) {
+        console.error('添加到审核队列时出错:', error);
       }
     }
     

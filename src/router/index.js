@@ -11,6 +11,8 @@ import ResetPassword from '../components/ResetPassword.vue';
 import Profile from '../components/Profile.vue';
 import Following from '../components/Following.vue';
 import Followers from '../components/Followers.vue';
+import Messages from '../components/Messages.vue';
+import Moderation from '../components/Moderation.vue';
 
 const routes = [
   { path: '/', name: 'home', component: GameList },
@@ -25,6 +27,8 @@ const routes = [
   { path: '/profile', name: 'profile', component: Profile },
   { path: '/profile/following', name: 'profile-following', component: Following },
   { path: '/profile/followers', name: 'profile-followers', component: Followers },
+  { path: '/messages', name: 'messages', component: Messages },
+  { path: '/moderation', name: 'moderation', component: Moderation },
 ];
 
 const router = createRouter({

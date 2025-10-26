@@ -3,6 +3,9 @@
     <div class="header-row">
       <h2>个人中心</h2>
       <div class="actions">
+        <router-link v-if="user" class="btn messages-btn" to="/messages">
+          📨 私信中心
+        </router-link>
         <button v-if="user" class="btn secondary" @click="logout">退出登录</button>
         <router-link v-else class="btn" to="/auth">去登录</router-link>
       </div>
