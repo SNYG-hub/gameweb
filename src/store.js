@@ -924,8 +924,13 @@ export async function sendPasswordResetEmail(email) {
       throw new Error('请输入有效的邮箱地址');
     }
 
+    // 确保使用正确的重定向 URL
+    const redirectUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5173/reset-password'
+      : 'https://gameweb-po34.vercel.app/reset-password';
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`
+      redirectTo: redirectUrl
     });
 
     if (error) {

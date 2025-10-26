@@ -187,12 +187,17 @@ VALUES (
 ### 步骤 7：配置重定向 URL
 
 1. 在 **Authentication** → **URL Configuration** 中
-2. 在 **Redirect URLs** 部分添加：
+2. **设置 Site URL**：
+   ```
+   https://gameweb-po34.vercel.app
+   ```
+3. 在 **Redirect URLs** 部分添加：
    ```
    https://gameweb-po34.vercel.app/reset-password
    http://localhost:5173/reset-password
    ```
-3. 点击 **Add URL** 保存
+4. **重要**：确保删除任何错误的 localhost URL
+5. 点击 **Save** 保存配置
 
 ### 步骤 8：执行密码重置配置 SQL
 
