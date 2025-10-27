@@ -45,6 +45,15 @@
       <label>
         图片画廊（可选择多张）
         <input type="file" multiple accept="image/*" class="input" @change="onGalleryChange" />
+        <div v-if="form.gallery.length > 0" class="gallery-preview">
+          <div class="preview-grid">
+            <div v-for="(img, index) in form.gallery" :key="index" class="preview-item">
+              <img :src="img" :alt="`画廊图片 ${index + 1}`" />
+              <button type="button" class="remove-btn" @click="removeGalleryImage(index)" title="删除图片">×</button>
+            </div>
+          </div>
+          <p class="gallery-info">已选择 {{ form.gallery.length }} 张图片</p>
+        </div>
       </label>
 
       <div class="actions">
@@ -111,6 +120,10 @@ async function onGalleryChange(e) {
   form.gallery = urls;
 }
 
+function removeGalleryImage(index) {
+  form.gallery.splice(index, 1);
+}
+
 async function onSubmit() {
   if (isSubmitting.value) return; // 防止重复提交
   
@@ -165,5 +178,67 @@ label { display: grid; gap: 6px; }
 .field { display: grid; gap: 8px; }
 .label { color: var(--text); font-weight: 600; }
 .genre-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+/* 画廊预览样式 */
+.gallery-preview {
+  margin-top: 12px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.preview-item {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #0a0f1c;
+  border: 1px solid var(--border);
+}
+
+.preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(220, 38, 38, 0.9);
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.remove-btn:hover {
+  background: rgba(220, 38, 38, 1);
+  transform: scale(1.1);
+}
+
+.gallery-info {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
 .check { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: #0b1020; }
 </style>

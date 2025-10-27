@@ -717,6 +717,12 @@ export async function addComment(postId, comment) {
     content,
     createdAt: Date.now()
   };
+  
+  // 确保 comments 数组存在
+  if (!Array.isArray(p.comments)) {
+    p.comments = [];
+  }
+  
   p.comments.push(newComment);
   
   // 2. 然后尝试保存到 Supabase
@@ -886,6 +892,7 @@ export async function signUp(payload) {
       name: username,
       username: username,
       email: email,
+      is_moderator: false, // 新用户默认不是审核员
       createdAt: new Date().toISOString()
     };
     
@@ -941,6 +948,7 @@ export async function signIn(payload, opts = {}) {
       email: authData.user.email,
       username: profileData.name,
       avatar_url: profileData.avatar_url,
+      is_moderator: profileData.is_moderator || false,
       createdAt: profileData.created_at
     };
     

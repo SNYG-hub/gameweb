@@ -3,6 +3,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text unique,
   avatar_url text,
+  is_moderator boolean default false,
   created_at timestamptz default now()
 );
 
@@ -18,6 +19,10 @@ create table if not exists public.games (
   official_url text,
   cover_url text,           -- 建议用 Storage 的公开 URL
   creator uuid references public.profiles(id) on delete set null,
+  status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamptz,
+  rejection_reason text,
   created_at timestamptz default now()
 );
 
@@ -47,6 +52,10 @@ create table if not exists public.posts (
   author_name text,               -- 允许展示名字快照
   content text,
   likes int default 0 check (likes >= 0),
+  status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamptz,
+  rejection_reason text,
   created_at timestamptz default now()
 );
 
@@ -80,7 +89,9 @@ create table if not exists public.relations (
 
 
 create index if not exists idx_games_created_at on public.games(created_at desc);
+create index if not exists idx_games_status on public.games(status);
 create index if not exists idx_posts_created_at on public.posts(created_at desc);
+create index if not exists idx_posts_status on public.posts(status);
 create index if not exists idx_comments_post_id_created_at on public.comments(post_id, created_at desc);
 create index if not exists idx_ratings_game_id on public.ratings(game_id);
 create index if not exists idx_game_images_game_id_position on public.game_images(game_id, position);
@@ -108,7 +119,11 @@ create policy "profiles_update_self" on public.profiles
 
 -- games
 create policy "games_select_public" on public.games
-  for select using (true);
+  for select using (
+    status = 'approved' OR 
+    creator = auth.uid() OR
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_moderator = true)
+  );
 create policy "games_insert_auth" on public.games
   for insert with check (auth.role() = 'authenticated');
 create policy "games_update_owner" on public.games
@@ -136,7 +151,11 @@ create policy "ratings_update_self" on public.ratings
 
 -- posts
 create policy "posts_select_public" on public.posts
-  for select using (true);
+  for select using (
+    status = 'approved' OR 
+    author_id = auth.uid() OR
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_moderator = true)
+  );
 create policy "posts_insert_auth" on public.posts
   for insert with check (auth.role() = 'authenticated');
 create policy "posts_update_owner" on public.posts

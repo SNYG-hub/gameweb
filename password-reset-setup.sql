@@ -31,10 +31,13 @@ CREATE TABLE IF NOT EXISTS public.password_reset_logs (
 -- 4. 启用 RLS
 ALTER TABLE public.password_reset_logs ENABLE ROW LEVEL SECURITY;
 
--- 5. 创建策略 - 只有管理员可以查看重置日志
+-- 5. 创建策略 - 只有审核员可以查看重置日志
+-- 删除已存在的策略（如果有）
+DROP POLICY IF EXISTS "password_reset_logs_admin_only" ON public.password_reset_logs;
+
 CREATE POLICY "password_reset_logs_admin_only" ON public.password_reset_logs
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_moderator = true)
   );
 
 -- 6. 创建索引
@@ -96,11 +99,14 @@ BEGIN
       reset_completed = true,
       completed_at = now()
     WHERE 
-      user_id = user_record.id 
-      AND reset_completed = false
-      AND requested_at > (now() - interval '1 hour')
-    ORDER BY requested_at DESC
-    LIMIT 1;
+      id = (
+        SELECT id FROM public.password_reset_logs
+        WHERE user_id = user_record.id 
+          AND reset_completed = false
+          AND requested_at > (now() - interval '1 hour')
+        ORDER BY requested_at DESC
+        LIMIT 1
+      );
     
     RETURN true;
   END IF;

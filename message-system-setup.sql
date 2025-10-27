@@ -60,6 +60,11 @@ ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.moderation_queue ENABLE ROW LEVEL SECURITY;
 
 -- 7. 私信系统 RLS 策略
+-- 删除已存在的策略（如果有）
+DROP POLICY IF EXISTS "messages_select_participants" ON public.messages;
+DROP POLICY IF EXISTS "messages_insert_sender" ON public.messages;
+DROP POLICY IF EXISTS "messages_update_receiver" ON public.messages;
+
 CREATE POLICY "messages_select_participants" ON public.messages
   FOR SELECT USING (
     sender_id = auth.uid() OR 
@@ -78,6 +83,10 @@ CREATE POLICY "messages_update_receiver" ON public.messages
   WITH CHECK (receiver_id = auth.uid());
 
 -- 8. 会话 RLS 策略
+-- 删除已存在的策略（如果有）
+DROP POLICY IF EXISTS "conversations_select_participants" ON public.conversations;
+DROP POLICY IF EXISTS "conversations_manage_participants" ON public.conversations;
+
 CREATE POLICY "conversations_select_participants" ON public.conversations
   FOR SELECT USING (
     user1_id = auth.uid() OR 
@@ -92,6 +101,10 @@ CREATE POLICY "conversations_manage_participants" ON public.conversations
   );
 
 -- 9. 审核队列 RLS 策略
+-- 删除已存在的策略（如果有）
+DROP POLICY IF EXISTS "moderation_queue_select_moderators" ON public.moderation_queue;
+DROP POLICY IF EXISTS "moderation_queue_update_moderators" ON public.moderation_queue;
+
 CREATE POLICY "moderation_queue_select_moderators" ON public.moderation_queue
   FOR SELECT USING (
     submitter_id = auth.uid() OR

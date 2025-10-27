@@ -50,13 +50,16 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { store } from '../store';
 import Carousel from './Carousel.vue';
+import { getCarouselImages } from '../utils/imageUtils.js';
 
 const carouselImages = computed(() => {
-  const imgs = store.games.map(g => g.cover).filter(Boolean);
-  return imgs.length ? imgs : [
-    'https://picsum.photos/seed/banner1/1200/600',
-    'https://picsum.photos/seed/banner2/1200/600',
-    'https://picsum.photos/seed/banner3/1200/600'
+  // Steam风格的游戏轮播图片
+  return [
+    'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1400&h=800&fit=crop&auto=format&q=90', // 游戏手柄 - ARC Raiders风格
+    'https://images.unsplash.com/photo-1586182987320-4f376d39d787?w=1400&h=800&fit=crop&auto=format&q=90', // 战争策略游戏 - Hearts of Iron IV风格
+    'https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?w=1400&h=800&fit=crop&auto=format&q=90', // 赛博朋克风格
+    'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=1400&h=800&fit=crop&auto=format&q=90', // 奇幻RPG风格
+    'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=1400&h=800&fit=crop&auto=format&q=90'  // 现代游戏设备
   ];
 });
 
@@ -102,8 +105,24 @@ onMounted(() => {});
 h2 { margin: 0 0 8px; text-align: center; }
 .muted { color: var(--muted); margin: 0 0 16px; text-align: center; }
 .toolbar { margin: 16px 0 16px; display: flex; justify-content: center; }
-.cover { width: 100%; height: 140px; background: #0a0f1c; display: flex; align-items: center; justify-content: center; }
-.cover img { width: 100%; height: 100%; object-fit: cover; }
+.cover { 
+  width: 100%; 
+  height: 180px; 
+  background: #0a0f1c; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+.cover img { 
+  max-width: 100%; 
+  max-height: 100%; 
+  width: auto;
+  height: auto;
+  object-fit: contain; /* 保持原始比例 */
+  transition: transform 0.3s ease;
+}
 .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .title { margin: 0; font-size: 18px; }
 .company, .price { margin: 6px 0; color: var(--muted); }
@@ -112,7 +131,32 @@ h2 { margin: 0 0 8px; text-align: center; }
 .card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0b1020; box-shadow: 0 8px 20px rgba(0,0,0,0.35); transition: transform .2s ease, box-shadow .2s ease; }
 .card.clickable { cursor: pointer; }
 .card:hover { transform: translateY(-4px); box-shadow: 0 12px 26px rgba(0,0,0,0.45); }
-.cover img { filter: saturate(1.08) contrast(1.05); }
+.card:hover .cover img { 
+  transform: scale(1.05);
+  filter: saturate(1.08) contrast(1.05); 
+}
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .grid.cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .grid.cols-3 {
+    grid-template-columns: 1fr;
+  }
+  
+  .cover {
+    height: 200px;
+  }
+  
+  .toolbar {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
 .type-wrap {
   position: relative;
   margin: 12px 0 16px;

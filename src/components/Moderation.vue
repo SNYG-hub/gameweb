@@ -72,7 +72,7 @@
               </div>
 
               <div class="submitter-info">
-                <span class="submitter">提交者: {{ item.submitterData?.username || '未知用户' }}</span>
+                <span class="submitter">提交者: {{ item.submitterData?.name || '未知用户' }}</span>
               </div>
 
               <div class="moderation-actions">
@@ -127,7 +127,7 @@
               </div>
 
               <div class="submitter-info">
-                <span class="submitter">提交者: {{ item.submitterData?.username || '未知用户' }}</span>
+                <span class="submitter">提交者: {{ item.submitterData?.name || '未知用户' }}</span>
               </div>
 
               <div class="moderation-actions">
@@ -184,7 +184,7 @@
                 {{ getContentTitle(item) }}
               </div>
               <div class="processed-details">
-                <span>提交者: {{ item.submitterData?.username || '未知用户' }}</span>
+                <span>提交者: {{ item.submitterData?.name || '未知用户' }}</span>
                 <span>处理时间: {{ formatTime(item.moderated_at) }}</span>
               </div>
               <div v-if="item.rejection_reason" class="rejection-reason">
@@ -245,7 +245,7 @@ async function loadPendingItems() {
       .from('moderation_queue')
       .select(`
         *,
-        submitterData:submitter_id(id, username)
+        submitterData:submitter_id(id, name)
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: true });
@@ -287,7 +287,7 @@ async function loadProcessedItems() {
       .from('moderation_queue')
       .select(`
         *,
-        submitterData:submitter_id(id, username)
+        submitterData:submitter_id(id, name)
       `)
       .in('status', ['approved', 'rejected'])
       .order('moderated_at', { ascending: false })
@@ -576,14 +576,22 @@ onMounted(async () => {
   width: 120px;
   height: 160px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0f1c;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
 }
 
 .game-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain; /* 保持原始比例 */
+  border-radius: 6px;
 }
 
 .game-details {
@@ -825,6 +833,8 @@ onMounted(async () => {
   .game-cover {
     width: 100%;
     height: 200px;
+    max-width: 300px;
+    margin: 0 auto;
   }
   
   .moderation-actions {
