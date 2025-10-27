@@ -512,15 +512,7 @@ export async function addGame(game) {
 
 // getGame函数已移至文件末尾，确保数据结构完整
 
-export function addRating(gameId, stars) {
-  const g = getGame(gameId);
-  if (!g) return null;
-  const s = Math.min(5, Math.max(1, Number(stars) || 0));
-  const id = newId('r');
-  if (!Array.isArray(g.ratings)) g.ratings = [];
-  g.ratings.push({ id, stars: s, createdAt: Date.now() });
-  return id;
-}
+// 原addRating函数已被重写，新版本在文件末尾
 
 export function getAverageStars(g) {
   const list = Array.isArray(g?.ratings) ? g.ratings : [];
