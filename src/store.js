@@ -141,7 +141,8 @@ function migrate(data) {
   base.games = Array.isArray(src.games) ? src.games : base.games;
   base.posts = Array.isArray(src.posts) ? src.posts.map(post => ({
     ...post,
-    comments: Array.isArray(post.comments) ? post.comments : []
+    comments: Array.isArray(post.comments) ? post.comments : [],
+    images: Array.isArray(post.images) ? post.images : []
   })) : base.posts;
 
   base.profiles = src.profiles && typeof src.profiles === 'object' ? src.profiles : {};
@@ -154,7 +155,8 @@ function migrate(data) {
   }));
   base.posts = base.posts.map(p => ({
     ...p,
-    images: Array.isArray(p.images) ? p.images : []
+    images: Array.isArray(p.images) ? p.images : [],
+    comments: Array.isArray(p.comments) ? p.comments : []
   }));
   return base;
 }
@@ -777,6 +779,90 @@ export function likePost(postId) {
   return p.likes;
 }
 
+// 删除帖子（仅审核员）
+export async function deletePost(postId) {
+  // 检查权限
+  if (!store.user?.is_moderator) {
+    console.error('只有审核员可以删除帖子');
+    return false;
+  }
+  
+  const postIndex = store.posts.findIndex(p => p.id === postId);
+  if (postIndex === -1) {
+    console.error('帖子不存在');
+    return false;
+  }
+  
+  const post = store.posts[postIndex];
+  
+  try {
+    // 如果帖子有 Supabase ID，从数据库中删除
+    if (post.supabase_id) {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', post.supabase_id);
+      
+      if (error) {
+        console.error('从数据库删除帖子失败:', error);
+        // 即使数据库删除失败，也继续删除本地数据
+      } else {
+        console.log('帖子已从数据库删除');
+      }
+    }
+    
+    // 从本地数组中删除
+    store.posts.splice(postIndex, 1);
+    console.log('帖子已删除:', postId);
+    return true;
+  } catch (error) {
+    console.error('删除帖子过程中出错:', error);
+    return false;
+  }
+}
+
+// 删除游戏（仅审核员）
+export async function deleteGame(gameId) {
+  // 检查权限
+  if (!store.user?.is_moderator) {
+    console.error('只有审核员可以删除游戏');
+    return false;
+  }
+  
+  const gameIndex = store.games.findIndex(g => g.id === gameId);
+  if (gameIndex === -1) {
+    console.error('游戏不存在');
+    return false;
+  }
+  
+  const game = store.games[gameIndex];
+  
+  try {
+    // 如果游戏有 Supabase ID，从数据库中删除
+    if (game.supabase_id) {
+      const { error } = await supabase
+        .from('games')
+        .delete()
+        .eq('id', game.supabase_id);
+      
+      if (error) {
+        console.error('从数据库删除游戏失败:', error);
+        // 即使数据库删除失败，也继续删除本地数据
+      } else {
+        console.log('游戏已从数据库删除');
+      }
+    }
+    
+    // 从本地数组中删除
+    store.games.splice(gameIndex, 1);
+    console.log('游戏已删除:', gameId);
+    return true;
+  } catch (error) {
+    console.error('删除游戏过程中出错:', error);
+    return false;
+  }
+}
+
 /* 用户状态（本地持久化） */
 export function getUser() {
   return store.user || null;
@@ -957,6 +1043,24 @@ export async function signIn(payload, opts = {}) {
 }
 export function signOut() {
   store.user = null;
+}
+
+// 创建测试审核员账号
+export function createTestModerator() {
+  store.user = {
+    id: 'test_moderator',
+    name: '测试审核员',
+    email: 'moderator@test.com',
+    username: '测试审核员',
+    is_moderator: true,
+    createdAt: new Date().toISOString()
+  };
+  
+  // 保存到本地profiles
+  store.profiles['测试审核员'] = store.user;
+  
+  console.log('已创建测试审核员账号:', store.user);
+  return true;
 }
 
 // 发送密码重置邮件

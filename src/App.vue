@@ -51,6 +51,7 @@
           <router-link class="btn small" to="/profile">个人中心</router-link>
         </template>
         <template v-else>
+          <button class="btn small test-btn" @click="loginAsModerator">测试审核员</button>
           <router-link class="nav-card small" to="/auth">
             <span class="nav-title">登录</span>
             <span class="nav-sub">进入个人中心</span>
@@ -70,7 +71,7 @@
 <script setup>
 import logo from './assets/cyberpunk-logo.svg';
 import { computed, ref, onMounted, watch } from 'vue';
-import { store, loadDataFromSupabase } from './store';
+import { store, loadDataFromSupabase, createTestModerator } from './store';
 import { supabase } from './supabase';
 
 const user = computed(() => store.user);
@@ -87,6 +88,12 @@ function applyTheme(){
 }
 function toggleTheme(){ theme.value = theme.value === 'dark' ? 'light' : 'dark'; applyTheme(); }
 applyTheme();
+
+// 登录为测试审核员
+function loginAsModerator() {
+  createTestModerator();
+  alert('已登录为测试审核员！现在可以删除游戏和帖子。');
+}
 
 // 获取未读消息数
 async function loadUnreadCount() {
@@ -144,6 +151,17 @@ onMounted(async () => {
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,"Noto Sans","PingFang SC","Microsoft YaHei","Hiragino Sans GB","WenQuanYi Micro Hei",sans-serif; }
+
+/* 微博风格页面的全局样式 - 使用原始深色背景 */
+.weibo-layout, .weibo-forum {
+  background: var(--bg) !important;
+}
+
+.layout:has(.weibo-layout) .main,
+.layout:has(.weibo-forum) .main {
+  background: var(--bg);
+  padding: 0;
+}
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
@@ -244,6 +262,16 @@ a:hover { text-decoration: underline; }
 
 .moderator-btn:hover {
   background: #d97706;
+}
+
+.test-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+}
+
+.test-btn:hover {
+  background: #059669;
 }
 .grid { display: grid; gap: 12px; }
 .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }

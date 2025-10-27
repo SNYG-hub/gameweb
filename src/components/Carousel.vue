@@ -1,5 +1,5 @@
 <template>
-  <div class="steam-carousel">
+  <div class="simple-carousel">
     <!-- 主显示区域 -->
     <div class="main-display">
       <div class="main-image">
@@ -10,32 +10,16 @@
         </div>
       </div>
       
-      <!-- 游戏信息覆盖层 -->
-      <div class="game-info-overlay">
-        <div class="game-info">
-          <h3>精选推荐</h3>
-          <p class="game-title">{{ gameTitle }}</p>
-          <div class="game-meta">
-            <span class="tag">热销商品</span>
-            <span class="price">¥ {{ gamePrice }}</span>
-          </div>
-          <button class="action-btn">立即预购</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- 右侧预览图 -->
-    <div class="preview-panel">
-      <div class="preview-grid">
-        <div 
+      <!-- 底部指示器 -->
+      <div class="indicators" v-if="images.length > 1">
+        <button 
           v-for="(img, idx) in images" 
           :key="idx"
-          class="preview-item"
+          class="indicator"
           :class="{ active: idx === current }"
           @click="go(idx)"
-        >
-          <img :src="img" :alt="`预览图 ${idx + 1}`" />
-        </div>
+          :aria-label="`切换到第 ${idx + 1} 张图片`"
+        ></button>
       </div>
     </div>
   </div>
@@ -58,22 +42,7 @@ const currentImage = computed(() => {
   return props.images[current.value] || '';
 });
 
-// 游戏信息数据
-const gameData = [
-  { title: 'ARC Raiders', price: '299.00' },
-  { title: 'Hearts of Iron IV', price: '318.00' },
-  { title: 'Cyberpunk 2077', price: '298.00' },
-  { title: 'The Witcher 3', price: '199.00' },
-  { title: 'Elden Ring', price: '398.00' }
-];
 
-const gameTitle = computed(() => {
-  return gameData[current.value]?.title || '精选游戏';
-});
-
-const gamePrice = computed(() => {
-  return gameData[current.value]?.price || '299.00';
-});
 
 function next() {
   if (props.images.length === 0) return;
@@ -104,7 +73,7 @@ function stop() {
 }
 
 onMounted(() => {
-  console.log('Steam轮播组件已挂载，图片数量:', props.images.length);
+  console.log('简单轮播组件已挂载，图片数量:', props.images.length);
   start();
 });
 
@@ -120,31 +89,27 @@ watch(() => props.images, (newImages) => {
 </script>
 
 <style scoped>
-.steam-carousel {
-  display: flex;
-  gap: 16px;
+.simple-carousel {
   width: 100%;
   height: 400px;
-  background: linear-gradient(135deg, #1e2328 0%, #0f1419 100%);
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #2a2d35;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  background: #f5f5f5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* 主显示区域 */
 .main-display {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   position: relative;
-  display: flex;
-  flex-direction: column;
 }
 
 .main-image {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   position: relative;
   overflow: hidden;
-  background: #0a0f1c;
 }
 
 .main-image img {
@@ -157,12 +122,6 @@ watch(() => props.images, (newImages) => {
 .overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    transparent 70%,
-    rgba(0, 0, 0, 0.8) 100%
-  );
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -176,7 +135,7 @@ watch(() => props.images, (newImages) => {
 }
 
 .nav-btn {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6);
   border: none;
   color: white;
   width: 50px;
@@ -191,183 +150,60 @@ watch(() => props.images, (newImages) => {
 }
 
 .nav-btn:hover {
-  background: rgba(0, 0, 0, 0.9);
-  transform: scale(1.1);
-}
-
-/* 游戏信息覆盖层 */
-.game-info-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.9) 0%,
-    rgba(0, 0, 0, 0.7) 50%,
-    rgba(0, 0, 0, 0.3) 80%,
-    transparent 100%
-  );
-  padding: 30px 20px 20px 20px;
-  pointer-events: none;
-}
-
-.game-info {
-  pointer-events: all;
-}
-
-.game-info h3 {
-  margin: 0 0 8px 0;
-  color: #66c0f4;
-  font-size: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.game-title {
-  margin: 0 0 12px 0;
-  color: #ffffff;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.game-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.tag {
-  background: #4c6b22;
-  color: #beee11;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.price {
-  color: #beee11;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.action-btn {
-  background: linear-gradient(135deg, #75b022 0%, #588a1b 100%);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.action-btn:hover {
-  background: linear-gradient(135deg, #83c429 0%, #658f1f 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(117, 176, 34, 0.4);
-}
-
-/* 右侧预览面板 */
-.preview-panel {
-  width: 200px;
-  padding: 16px;
-  background: #1e2328;
-  border-left: 1px solid #2a2d35;
-}
-
-.preview-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  height: 100%;
-}
-
-.preview-item {
-  flex: 1;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.preview-item:hover {
-  border-color: #66c0f4;
+  background: rgba(0, 0, 0, 0.8);
   transform: scale(1.05);
 }
 
-.preview-item.active {
-  border-color: #beee11;
-  box-shadow: 0 0 12px rgba(190, 238, 17, 0.4);
+/* 底部指示器 */
+.indicators {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 10;
 }
 
-.preview-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
+.indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.preview-item:hover img {
-  transform: scale(1.1);
+.indicator:hover {
+  background: rgba(255, 255, 255, 0.8);
+  transform: scale(1.2);
+}
+
+.indicator.active {
+  background: #ffffff;
+  transform: scale(1.3);
 }
 
 /* 响应式设计 */
-@media (max-width: 1024px) {
-  .steam-carousel {
-    height: 350px;
-  }
-  
-  .preview-panel {
-    width: 160px;
-  }
-  
-  .game-title {
-    font-size: 20px;
-  }
-}
-
 @media (max-width: 768px) {
-  .steam-carousel {
-    flex-direction: column;
-    height: auto;
-  }
-  
-  .main-display {
+  .simple-carousel {
     height: 300px;
   }
   
-  .preview-panel {
-    width: 100%;
-    height: 120px;
-    border-left: none;
-    border-top: 1px solid #2a2d35;
+  .nav-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
   }
   
-  .preview-grid {
-    flex-direction: row;
-    overflow-x: auto;
+  .indicators {
+    bottom: 15px;
   }
   
-  .preview-item {
-    flex: 0 0 100px;
-  }
-  
-  .game-info-overlay {
-    padding: 20px 16px 16px 16px;
-  }
-  
-  .game-title {
-    font-size: 18px;
+  .indicator {
+    width: 10px;
+    height: 10px;
   }
 }
 </style>

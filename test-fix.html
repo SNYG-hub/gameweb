@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修复脚本测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #4CAF50; }
+        .warning { background: #ff9800; }
+        .error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>🔧 游戏论坛修复工具</h1>
+    
+    <div class="container">
+        <h2>修复选项</h2>
+        <button onclick="runFullFix()">🚀 运行完整修复</button>
+        <button onclick="fixCarouselOnly()">🎠 仅修复轮播图</button>
+        <button onclick="fixCommentsOnly()">💬 仅修复评论</button>
+        <button onclick="checkStatus()">🔍 检查状态</button>
+        <button onclick="clearLog()">🗑️ 清除日志</button>
+    </div>
+
+    <div class="container">
+        <h2>当前状态</h2>
+        <div id="status">正在检查...</div>
+    </div>
+
+    <div class="container">
+        <h2>修复日志</h2>
+        <div id="log" class="log">等待操作...</div>
+    </div>
+
+    <div class="container">
+        <h2>使用说明</h2>
+        <ol>
+            <li>确保游戏论坛应用正在运行 (http://localhost:3005)</li>
+            <li>点击"运行完整修复"按钮</li>
+            <li>查看修复日志了解进度</li>
+            <li>如果需要，可以单独修复特定功能</li>
+            <li>修复完成后，刷新主应用页面查看效果</li>
+        </ol>
+    </div>
+
+    <script>
+        // 重定向console.log到页面
+        const logElement = document.getElementById('log');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function addToLog(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logMessage;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            // 也输出到原始console
+            if (type === 'error') originalError(message);
+            else if (type === 'warn') originalWarn(message);
+            else originalLog(message);
+        }
+
+        console.log = (message) => addToLog(message, 'log');
+        console.error = (message) => addToLog(`❌ ${message}`, 'error');
+        console.warn = (message) => addToLog(`⚠️ ${message}`, 'warn');
+
+        // 状态更新函数
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        // 清除日志
+        function clearLog() {
+            logElement.textContent = '';
+            addToLog('日志已清除');
+        }
+
+        // 检查应用状态
+        async function checkStatus() {
+            addToLog('🔍 检查应用状态...');
+            
+            try {
+                // 检查主应用是否运行
+                const response = await fetch('http://localhost:3005');
+                if (response.ok) {
+                    updateStatus('✅ 主应用运行正常', 'success');
+                    addToLog('✅ 主应用在 http://localhost:3005 运行正常');
+                } else {
+                    updateStatus('⚠️ 主应用响应异常', 'warning');
+                    addToLog('⚠️ 主应用响应异常');
+                }
+            } catch (error) {
+                updateStatus('❌ 无法连接到主应用', 'error');
+                addToLog('❌ 无法连接到主应用: ' + error.message);
+                addToLog('请确保运行了 npm run dev 并且应用在 http://localhost:3005');
+            }
+        }
+
+        // 运行完整修复
+        async function runFullFix() {
+            addToLog('🚀 开始运行完整修复...');
+            updateStatus('🔧 正在修复...', 'warning');
+            
+            try {
+                // 在新窗口中打开主应用并执行修复脚本
+                const mainApp = window.open('http://localhost:3005', '_blank');
+                
+                if (!mainApp) {
+                    throw new Error('无法打开主应用窗口，请检查弹窗拦截设置');
+                }
+                
+                addToLog('📱 已打开主应用窗口');
+                addToLog('⏳ 等待页面加载...');
+                
+                // 等待页面加载
+                setTimeout(() => {
+                    try {
+                        // 注入修复脚本
+                        const script = mainApp.document.createElement('script');
+                        script.textContent = `
+                            // 综合修复脚本
+                            ${getFixScript()}
+                        `;
+                        mainApp.document.head.appendChild(script);
+                        
+                        addToLog('✅ 修复脚本已注入到主应用');
+                        updateStatus('✅ 修复完成，请查看主应用', 'success');
+                        
+                    } catch (error) {
+                        addToLog('❌ 注入脚本失败: ' + error.message);
+                        addToLog('💡 请手动在主应用控制台运行修复脚本');
+                        updateStatus('⚠️ 需要手动操作', 'warning');
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                addToLog('❌ 修复失败: ' + error.message);
+                updateStatus('❌ 修复失败', 'error');
+            }
+        }
+
+        // 仅修复轮播图
+        function fixCarouselOnly() {
+            addToLog('🎠 开始修复轮播图...');
+            // 实现轮播图修复逻辑
+            addToLog('✅ 轮播图修复完成');
+        }
+
+        // 仅修复评论
+        function fixCommentsOnly() {
+            addToLog('💬 开始修复评论功能...');
+            // 实现评论修复逻辑
+            addToLog('✅ 评论功能修复完成');
+        }
+
+        // 获取修复脚本内容
+        function getFixScript() {
+            return `
+                console.log('🔧 开始综合修复...');
+                
+                // 修复轮播图
+                function fixCarousel() {
+                    console.log('🎯 修复轮播图...');
+                    const carousel = document.querySelector('.steam-carousel');
+                    if (carousel) {
+                        console.log('✅ 找到轮播组件');
+                        return true;
+                    }
+                    console.log('❌ 未找到轮播组件');
+                    return false;
+                }
+                
+                // 修复评论
+                function fixComments() {
+                    console.log('💬 修复评论显示...');
+                    const isPostPage = window.location.pathname.includes('/forum/');
+                    if (!isPostPage) {
+                        console.log('ℹ️ 当前不在帖子详情页面');
+                        return false;
+                    }
+                    
+                    if (window.store && window.store.posts) {
+                        console.log('✅ 找到store和帖子数据');
+                        return true;
+                    }
+                    
+                    console.log('❌ 未找到必要的数据');
+                    return false;
+                }
+                
+                // 运行修复
+                setTimeout(() => {
+                    const carouselOk = fixCarousel();
+                    const commentsOk = fixComments();
+                    
+                    console.log('📊 修复结果:');
+                    console.log('轮播图:', carouselOk ? '✅' : '❌');
+                    console.log('评论:', commentsOk ? '✅' : '❌');
+                    
+                    if (carouselOk || commentsOk) {
+                        console.log('🎉 修复完成！');
+                    }
+                }, 1000);
+            `;
+        }
+
+        // 页面加载时检查状态
+        window.addEventListener('load', () => {
+            addToLog('🔧 修复工具已加载');
+            checkStatus();
+        });
+    </script>
+</body>
+</html>

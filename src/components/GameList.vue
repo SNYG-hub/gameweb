@@ -37,6 +37,11 @@
           </div>
           <p class="company">开发/发行：{{ g.company }}</p>
           <p class="price">定价：¥{{ g.price }}</p>
+          <div v-if="isModerator" class="game-actions">
+            <button class="delete-game-btn" @click.stop="deleteGame(g.id)" title="删除游戏">
+              🗑️删除
+            </button>
+          </div>
         </div>
       </article>
     </div>
@@ -48,7 +53,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { store } from '../store';
+import { store, deleteGame as _deleteGame } from '../store';
 import Carousel from './Carousel.vue';
 import { getCarouselImages } from '../utils/imageUtils.js';
 
@@ -98,6 +103,19 @@ function scrollTypes(dir) {
 }
 const router = useRouter();
 function goGame(id){ router.push(`/game/${id}`); }
+
+// 检查当前用户是否为审核员
+const isModerator = computed(() => {
+  return store.user?.is_moderator || false;
+});
+
+// 删除游戏功能
+function deleteGame(gameId) {
+  if (confirm('确定要删除这个游戏吗？此操作不可撤销。')) {
+    _deleteGame(gameId);
+  }
+}
+
 onMounted(() => {});
 </script>
 
@@ -135,6 +153,33 @@ h2 { margin: 0 0 8px; text-align: center; }
   transform: scale(1.05);
   filter: saturate(1.08) contrast(1.05); 
 }
+
+/* 游戏删除按钮样式 */
+.game-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.delete-game-btn {
+  padding: 4px 12px;
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 16px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.delete-game-btn:hover {
+  background: #ef4444;
+  color: white;
+}
+
 /* 响应式设计 */
 @media (max-width: 1024px) {
   .grid.cols-3 {
@@ -220,5 +265,33 @@ h2 { margin: 0 0 8px; text-align: center; }
 .type-scroll.next { right: -6px; }
 .type-actions { margin-top: 8px; display: flex; justify-content: center; }
 .btn.small { padding: 6px 10px; font-size: 12px; }
+
+/* 游戏删除按钮样式 */
+.game-actions {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.delete-game-btn {
+  padding: 6px 12px;
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: center;
+}
+
+.delete-game-btn:hover {
+  background: #ef4444;
+  color: white;
+}
 
 </style>
