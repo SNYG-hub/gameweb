@@ -96,11 +96,21 @@ const post = computed(() => {
   if (foundPost) {
     console.log('当前帖子数据:', foundPost);
     console.log('帖子图片:', foundPost.images);
+    console.log('帖子评论:', foundPost.comments);
     
-    // 如果帖子有 Supabase ID 但没有图片，尝试重新加载
-    if (foundPost.supabase_id && (!foundPost.images || foundPost.images.length === 0)) {
-      console.log('检测到帖子缺少图片数据，尝试重新加载...');
-      loadPostImages(foundPost);
+    // 如果帖子有 Supabase ID，尝试加载完整数据
+    if (foundPost.supabase_id) {
+      // 检查图片数据
+      if (!foundPost.images || foundPost.images.length === 0) {
+        console.log('检测到帖子缺少图片数据，尝试重新加载...');
+        loadPostImages(foundPost);
+      }
+      
+      // 检查评论数据
+      if (!foundPost.comments || foundPost.comments.length === 0) {
+        console.log('检测到帖子缺少评论数据，尝试重新加载...');
+        loadPostComments(foundPost);
+      }
     }
   }
   return foundPost;
@@ -209,6 +219,58 @@ async function loadPostImages(postData) {
     }
   } catch (error) {
     console.error('加载帖子图片过程中出错:', error);
+  }
+}
+
+// 重新加载帖子评论
+async function loadPostComments(postData) {
+  if (!postData.supabase_id) return;
+  
+  try {
+    console.log('从数据库加载帖子评论:', postData.supabase_id);
+    
+    // 从 Supabase 加载评论数据
+    const { data: commentsData, error } = await supabase
+      .from('comments')
+      .select(`
+        *,
+        profiles:author_id(name, avatar_url)
+      `)
+      .eq('post_id', postData.supabase_id)
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error('加载帖子评论失败:', error);
+      return;
+    }
+    
+    if (commentsData && commentsData.length > 0) {
+      const comments = commentsData.map(comment => ({
+        id: comment.id,
+        author: comment.author_name || comment.profiles?.name || '匿名',
+        content: comment.content,
+        createdAt: new Date(comment.created_at).getTime()
+      }));
+      
+      console.log('成功加载帖子评论:', comments);
+      
+      // 更新本地帖子数据
+      postData.comments = comments;
+      
+      // 强制触发响应式更新
+      const postIndex = store.posts.findIndex(p => p.id === postData.id);
+      if (postIndex !== -1) {
+        store.posts[postIndex] = { ...postData };
+      }
+    } else {
+      console.log('该帖子暂无评论');
+      // 确保评论数组存在
+      if (!postData.comments) {
+        postData.comments = [];
+      }
+    }
+  } catch (error) {
+    console.error('加载帖子评论过程中出错:', error);
   }
 }
 </script>

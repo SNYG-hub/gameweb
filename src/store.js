@@ -113,7 +113,8 @@ const defaultState = {
         'https://picsum.photos/seed/game3/1200/600'
       ],
       createdAt: Date.now(),
-      ratings: [] // 每条：{ id, stars(1-5), createdAt }
+      ratings: [], // 每条：{ userId, rating(1-5), createdAt }
+      comments: [] // 每条：{ id, author, content, rating, createdAt, likes }
     }
   ],
   posts: [
@@ -138,7 +139,10 @@ function migrate(data) {
   base.user = src.user ?? base.user;
 
   base.games = Array.isArray(src.games) ? src.games : base.games;
-  base.posts = Array.isArray(src.posts) ? src.posts : base.posts;
+  base.posts = Array.isArray(src.posts) ? src.posts.map(post => ({
+    ...post,
+    comments: Array.isArray(post.comments) ? post.comments : []
+  })) : base.posts;
 
   base.profiles = src.profiles && typeof src.profiles === 'object' ? src.profiles : {};
   base.relations = src.relations && typeof src.relations === 'object' ? src.relations : {};
@@ -506,9 +510,7 @@ export async function addGame(game) {
   return { localId: id, supabaseId: supabaseGameId };
 }
 
-export function getGame(id) {
-  return store.games.find(g => g.id === id);
-}
+// getGame函数已移至文件末尾，确保数据结构完整
 
 export function addRating(gameId, stars) {
   const g = getGame(gameId);
@@ -1060,4 +1062,127 @@ export function followersOf(name) {
 }
 export function followingOf(name) {
   return ensureRel(name).following.map(n => ({ id: n, name: n, avatar: getAvatarByName(n) }));
+}
+
+/* 游戏评分系统 - 每人只能评分一次 */
+export function getUserRating(gameId) {
+  if (!gameId || !store.user?.name) return 0;
+  
+  const game = getGame(gameId);
+  if (!game || !Array.isArray(game.ratings)) return 0;
+  
+  const userRating = game.ratings.find(r => r.userId === store.user.name);
+  return userRating ? userRating.rating : 0;
+}
+
+export function withdrawUserRating(gameId) {
+  if (!gameId || !store.user?.name) return false;
+  
+  const game = getGame(gameId);
+  if (!game) return false;
+  
+  if (!Array.isArray(game.ratings)) {
+    game.ratings = [];
+    return false;
+  }
+  
+  const initialLength = game.ratings.length;
+  game.ratings = game.ratings.filter(r => r.userId !== store.user.name);
+  
+  console.log(`用户 ${store.user.name} 撤回了对游戏 ${game.title} 的评分`);
+  return game.ratings.length < initialLength;
+}
+
+// 重写原有的addRating函数，支持每人一次评分
+export function addRating(gameId, rating) {
+  if (!gameId || !store.user?.name) return false;
+  
+  const game = getGame(gameId);
+  if (!game) return false;
+  
+  if (!Array.isArray(game.ratings)) {
+    game.ratings = [];
+  }
+  
+  // 检查用户是否已经评分
+  const existingRatingIndex = game.ratings.findIndex(r => r.userId === store.user.name);
+  
+  const ratingData = {
+    userId: store.user.name,
+    rating: rating,
+    createdAt: Date.now()
+  };
+  
+  if (existingRatingIndex !== -1) {
+    // 更新现有评分
+    game.ratings[existingRatingIndex] = ratingData;
+    console.log(`用户 ${store.user.name} 更新了对游戏 ${game.title} 的评分: ${rating} 星`);
+  } else {
+    // 添加新评分
+    game.ratings.push(ratingData);
+    console.log(`用户 ${store.user.name} 对游戏 ${game.title} 评分: ${rating} 星`);
+  }
+  
+  return true;
+}
+
+/* 游戏评论系统 */
+export function addGameComment(gameId, commentData) {
+  if (!gameId || !commentData.content?.trim()) return false;
+  
+  const game = getGame(gameId);
+  if (!game) return false;
+  
+  if (!Array.isArray(game.comments)) {
+    game.comments = [];
+  }
+  
+  const comment = {
+    id: newId('gc'),
+    author: commentData.author || '匿名',
+    content: commentData.content.trim(),
+    rating: commentData.rating || 0,
+    createdAt: Date.now(),
+    likes: 0
+  };
+  
+  game.comments.unshift(comment); // 新评论显示在前面
+  
+  console.log(`新增游戏评论:`, comment);
+  return comment.id;
+}
+
+export function likeGameComment(gameId, commentId) {
+  if (!gameId || !commentId) return false;
+  
+  const game = getGame(gameId);
+  if (!game || !Array.isArray(game.comments)) return false;
+  
+  const comment = game.comments.find(c => c.id === commentId);
+  if (!comment) return false;
+  
+  comment.likes = (comment.likes || 0) + 1;
+  console.log(`评论 ${commentId} 获得点赞，当前点赞数: ${comment.likes}`);
+  return true;
+}
+
+// 确保游戏数据结构完整
+function ensureGameStructure(game) {
+  if (!game) return null;
+  
+  if (!Array.isArray(game.ratings)) {
+    game.ratings = [];
+  }
+  
+  if (!Array.isArray(game.comments)) {
+    game.comments = [];
+  }
+  
+  return game;
+}
+
+// 重写getGame函数，确保数据结构完整
+export function getGame(id) {
+  const game = store.games.find(g => g.id === id);
+  return ensureGameStructure(game);
 }
